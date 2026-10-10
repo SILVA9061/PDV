@@ -1,16 +1,45 @@
 // ==========================================
-// 1. CONFIGURAÇÃO
+// 0. DETECÇÃO DE DISPOSITIVO (mobile vs desktop)
+// ==========================================
+(function detectarDispositivo() {
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const isMobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isSmallScreen = window.innerWidth < 900;
+    
+    // Considera mobile se tem touch E é mobile UA OU tela pequena
+    const isMobile = (isTouch && isMobileUA) || (isTouch && isSmallScreen);
+    
+    if (isMobile) {
+        document.documentElement.classList.add('is-mobile');
+        console.log('📱 Modo mobile detectado');
+    } else {
+        document.documentElement.classList.add('is-desktop');
+        console.log('💻 Modo desktop detectado');
+    }
+})();
+
+// ==========================================
+// 1. CONFIGURAÇÃO SUPABASE
 // ==========================================
 const SUPABASE_URL = 'https://pqmsgpccifptjmduflca.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbXNncGNjaWZwdGptZHVmbGNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTMxNjUsImV4cCI6MjEwNzIyOTE2NX0.5PyX7New60N0EsWzWzdni3b5l0L_aaWClJRe6DRLYK0';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ==========================================
+// 2. LINKS DE DOWNLOAD (SUPABASE STORAGE)
+// ==========================================
+// ⚠️ SUBSTITUA pelas URLs reais dos arquivos no seu bucket DOWNLOADS
+const URL_DOWNLOAD_WINDOWS = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BR.Test.PDV_0.0.1_x64-setup.exe';
+const URL_DOWNLOAD_ANDROID = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BR-Test-PDV.apk';
+const URL_DOWNLOAD_IOS     = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BR-Test-PDV.ipa';
+
 let caixaAtual = null;
 let acaoConfirmada = null;
+let modalAbertoEm = 0; // Timestamp para evitar "Enter duplo"
 
 // ==========================================
-// 2. UTILITÁRIOS
+// 3. UTILITÁRIOS
 // ==========================================
 function formatarMoeda(valor) {
     return parseFloat(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -20,6 +49,8 @@ function abrirModal(titulo, mensagem, callbackConfirmar = null) {
     document.getElementById('modal-titulo').textContent = titulo;
     document.getElementById('modal-mensagem').textContent = mensagem;
     document.getElementById('modal-overlay').classList.add('ativo');
+    modalAbertoEm = Date.now(); // Marca quando abriu
+    
     const btnCancelar = document.getElementById('modal-btn-cancelar');
     const btnConfirmar = document.getElementById('modal-btn-confirmar');
     if (callbackConfirmar) {
@@ -44,10 +75,21 @@ function confirmarModal() {
     fecharModal();
 }
 
+function abrirModalDownloads() {
+    document.getElementById('link-download-windows').href = URL_DOWNLOAD_WINDOWS;
+    document.getElementById('link-download-android').href = URL_DOWNLOAD_ANDROID;
+    document.getElementById('link-download-ios').href = URL_DOWNLOAD_IOS;
+    document.getElementById('modal-downloads').classList.add('ativo');
+    modalAbertoEm = Date.now();
+}
+
+function fecharModalDownloads() {
+    document.getElementById('modal-downloads').classList.remove('ativo');
+}
+
 function obterRangePeriodo(periodo, dataInicio = null, dataFim = null) {
     const agora = new Date();
     let inicio, fim;
-
     if (periodo === 'hoje') {
         inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
         fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
@@ -65,23 +107,38 @@ function obterRangePeriodo(periodo, dataInicio = null, dataFim = null) {
 }
 
 // ==========================================
-// 3. SISTEMA DE ATALHOS DE TECLADO
+// 4. ATALHOS DE TECLADO (apenas desktop)
 // ==========================================
 document.addEventListener('keydown', (e) => {
-    // === MODAL ABERTO ===
-    if (document.getElementById('modal-overlay').classList.contains('ativo')) {
-        if (e.key === 'Escape') { e.preventDefault(); fecharModal(); return; }
-        if (e.key === 'Enter') { e.preventDefault(); confirmarModal(); return; }
+    // Se algum modal estiver aberto
+    const modalAviso = document.getElementById('modal-overlay').classList.contains('ativo');
+    const modalDown = document.getElementById('modal-downloads').classList.contains('ativo');
+
+    if (modalAviso || modalDown) {
+        // Ignora Enter se o modal acabou de abrir (evita "Enter duplo" que fecha na hora)
+        const tempoDesdeAbertura = Date.now() - modalAbertoEm;
+        
+        if (e.key === 'Escape') { 
+            e.preventDefault(); 
+            if (modalAviso) fecharModal();
+            if (modalDown) fecharModalDownloads();
+            return; 
+        }
+        if (e.key === 'Enter' && tempoDesdeAbertura > 250) { 
+            e.preventDefault(); 
+            if (modalAviso) confirmarModal();
+            return; 
+        }
         return;
     }
 
-    // === ESC = Voltar ao Menu ===
+    // Esc = Voltar ao Menu
     if (e.key === 'Escape') {
         if (caixaAtual) { e.preventDefault(); renderizarMenuPrincipal(); }
         return;
     }
 
-    // === ATALHOS F-KEYS ===
+    // F-Keys (só se caixa aberto)
     if (caixaAtual) {
         const atalhos = {
             'F2': () => renderizarTelaNovaVenda(),
@@ -92,16 +149,12 @@ document.addEventListener('keydown', (e) => {
             'F7': () => renderizarTelaVendedores(),
             'F8': () => renderizarTelaFecharCaixa()
         };
-
-        if (atalhos[e.key]) {
-            e.preventDefault();
-            atalhos[e.key]();
-        }
+        if (atalhos[e.key]) { e.preventDefault(); atalhos[e.key](); }
     }
 });
 
 // ==========================================
-// 4. INICIALIZAÇÃO
+// 5. INICIALIZAÇÃO
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     await verificarCaixaAberto();
@@ -134,7 +187,7 @@ async function verificarCaixaAberto() {
 }
 
 // ==========================================
-// 5. ABRIR CAIXA
+// 6. ABRIR CAIXA
 // ==========================================
 function renderizarTelaAbrirCaixa() {
     document.getElementById('app-container').innerHTML = `
@@ -144,11 +197,11 @@ function renderizarTelaAbrirCaixa() {
             <div class="form-container">
                 <div class="form-group">
                     <label>👤 Operador</label>
-                    <input type="text" id="input-operador" placeholder="Seu nome" class="input-grande" onkeydown="if(event.key==='Enter') document.getElementById('input-valor-inicial').focus()">
+                    <input type="text" id="input-operador" placeholder="Seu nome" class="input-grande" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('input-valor-inicial').focus();}">
                 </div>
                 <div class="form-group">
                     <label>💵 Valor Inicial</label>
-                    <input type="number" id="input-valor-inicial" placeholder="0,00" step="0.01" class="input-grande" onkeydown="if(event.key==='Enter') abrirCaixa()">
+                    <input type="number" id="input-valor-inicial" placeholder="0,00" step="0.01" class="input-grande" onkeydown="if(event.key==='Enter'){event.preventDefault(); abrirCaixa();}">
                 </div>
                 <button onclick="abrirCaixa()" class="btn-primario btn-pill">ABRIR CAIXA <span class="kbd-hint">Enter</span></button>
             </div>
@@ -174,7 +227,7 @@ async function abrirCaixa() {
 }
 
 // ==========================================
-// 6. MENU PRINCIPAL
+// 7. MENU PRINCIPAL
 // ==========================================
 async function renderizarMenuPrincipal() {
     const { data: movimentos } = await supabaseClient
@@ -213,19 +266,19 @@ async function renderizarMenuPrincipal() {
 }
 
 // ==========================================
-// 7. NOVA VENDA
+// 8. NOVA VENDA
 // ==========================================
 async function renderizarTelaNovaVenda() {
     const { data: vendedores } = await supabaseClient
         .from('vendedores').select('*').eq('ativo', true).order('nome');
 
-    let optionsVendedores = '<option value="">Selecione o vendedor</option>';
+    let optionsVendedores = '<option value="">— Selecione o vendedor —</option>';
     if (vendedores && vendedores.length > 0) {
         vendedores.forEach(v => {
             optionsVendedores += `<option value="${v.id}" data-comissao="${v.comissao_percentual}">${v.nome} (${v.comissao_percentual}%)</option>`;
         });
     } else {
-        optionsVendedores = '<option value="">Nenhum vendedor cadastrado</option>';
+        optionsVendedores = '<option value="">⚠️ Nenhum vendedor cadastrado</option>';
     }
 
     document.getElementById('app-container').innerHTML = `
@@ -234,7 +287,7 @@ async function renderizarTelaNovaVenda() {
             <h2>Nova Venda</h2>
             <div class="form-container">
                 <div class="form-group">
-                    <label>👤 Vendedor</label>
+                    <label>👤 Vendedor *</label>
                     <select id="venda-vendedor" class="input-grande" onchange="atualizarComissao()">
                         ${optionsVendedores}
                     </select>
@@ -245,7 +298,7 @@ async function renderizarTelaNovaVenda() {
                 </div>
                 <div class="form-group">
                     <label>💵 Valor (R$)</label>
-                    <input type="number" id="venda-valor" placeholder="0,00" step="0.01" class="input-grande" oninput="atualizarComissao()" onkeydown="if(event.key==='Enter') registrarVenda()">
+                    <input type="number" id="venda-valor" placeholder="0,00" step="0.01" class="input-grande" oninput="atualizarComissao()" onkeydown="if(event.key==='Enter'){event.preventDefault(); registrarVenda();}">
                 </div>
                 <div class="form-group">
                     <label>💳 Forma de Pagamento</label>
@@ -277,9 +330,15 @@ function atualizarComissao() {
 async function registrarVenda() {
     const select = document.getElementById('venda-vendedor');
     const vendedorId = select.value;
-    const vendedorNomeCompleto = select.options[select.selectedIndex]?.text || 'Não informado';
-    const vendedorNome = vendedorNomeCompleto.replace(/\s*\(.*\)$/, '');
-    const comissaoPct = parseFloat(select.options[select.selectedIndex]?.dataset.comissao) || 0;
+    if (!vendedorId) {
+        abrirModal('Atenção', 'Selecione um vendedor antes de registrar a venda.');
+        select.focus();
+        return;
+    }
+
+    const vendedorNomeCompleto = select.options[select.selectedIndex].text;
+    const vendedorNome = vendedorNomeCompleto.replace(/\s*\(.*\)$/, '').trim();
+    const comissaoPct = parseFloat(select.options[select.selectedIndex].dataset.comissao) || 0;
     const produto = document.getElementById('venda-produto').value.trim();
     const valor = parseFloat(document.getElementById('venda-valor').value);
     const pagamento = document.getElementById('venda-pagamento').value;
@@ -295,19 +354,19 @@ async function registrarVenda() {
         forma_pagamento: pagamento,
         produto: produto || 'Não informado',
         vendedor: vendedorNome,
-        vendedor_id: vendedorId || null,
+        vendedor_id: vendedorId,
         comissao_percentual: comissaoPct,
         comissao_valor: comissaoValor
     }]);
 
     if (error) { abrirModal('Erro', 'Erro ao registrar: ' + error.message); return; }
 
-    abrirModal('Sucesso', `Venda de ${formatarMoeda(valor)} registrada!\nComissão: ${formatarMoeda(comissaoValor)}`);
+    abrirModal('Sucesso', `Venda de ${formatarMoeda(valor)} registrada!\nVendedor: ${vendedorNome}\nComissão: ${formatarMoeda(comissaoValor)}`);
     await renderizarMenuPrincipal();
 }
 
 // ==========================================
-// 8. SANGRIA E SUPRIMENTO
+// 9. SANGRIA E SUPRIMENTO
 // ==========================================
 function renderizarTelaSangria() {
     document.getElementById('app-container').innerHTML = `
@@ -322,7 +381,7 @@ function renderizarTelaSangria() {
                 </div>
                 <div class="form-group">
                     <label>📝 Descrição (Opcional)</label>
-                    <input type="text" id="sangria-descricao" placeholder="Ex: Pagamento fornecedor" class="input-grande" onkeydown="if(event.key==='Enter') registrarSangria()">
+                    <input type="text" id="sangria-descricao" placeholder="Ex: Pagamento fornecedor" class="input-grande" onkeydown="if(event.key==='Enter'){event.preventDefault(); registrarSangria();}">
                 </div>
                 <button onclick="registrarSangria()" class="btn-perigo btn-pill">CONFIRMAR SANGRIA <span class="kbd-hint">Enter</span></button>
             </div>
@@ -357,7 +416,7 @@ function renderizarTelaSuprimento() {
                 </div>
                 <div class="form-group">
                     <label>📝 Descrição (Opcional)</label>
-                    <input type="text" id="suprimento-descricao" placeholder="Ex: Troco inicial" class="input-grande" onkeydown="if(event.key==='Enter') registrarSuprimento()">
+                    <input type="text" id="suprimento-descricao" placeholder="Ex: Troco inicial" class="input-grande" onkeydown="if(event.key==='Enter'){event.preventDefault(); registrarSuprimento();}">
                 </div>
                 <button onclick="registrarSuprimento()" class="btn-sucesso btn-pill">CONFIRMAR SUPRIMENTO <span class="kbd-hint">Enter</span></button>
             </div>
@@ -380,7 +439,7 @@ async function registrarSuprimento() {
 }
 
 // ==========================================
-// 9. GERENCIAR VENDEDORES
+// 10. GERENCIAR VENDEDORES
 // ==========================================
 async function renderizarTelaVendedores() {
     const { data: vendedores, error } = await supabaseClient
@@ -434,7 +493,7 @@ function renderizarFormVendedor(id = null, nome = '', comissao = 0, ativo = true
                 </div>
                 <div class="form-group">
                     <label>💰 Comissão (%)</label>
-                    <input type="number" id="vend-comissao" placeholder="0" step="0.1" min="0" max="100" class="input-grande" value="${comissao}">
+                    <input type="number" id="vend-comissao" placeholder="0" step="0.1" min="0" max="100" class="input-grande" value="${comissao}" onkeydown="if(event.key==='Enter'){event.preventDefault(); salvarVendedor('${id || ''}');}">
                 </div>
                 <div class="form-group">
                     <label>Status</label>
@@ -492,18 +551,37 @@ async function reativarVendedor(id) {
 }
 
 // ==========================================
-// 10. HISTÓRICO COM FILTRO
+// 11. HISTÓRICO COM FILTRO
 // ==========================================
 async function renderizarHistorico() {
+    const { data: vendedores } = await supabaseClient
+        .from('vendedores').select('nome').order('nome');
+
+    let optionsVendedores = '<option value="">Todos os vendedores</option>';
+    if (vendedores && vendedores.length > 0) {
+        vendedores.forEach(v => {
+            optionsVendedores += `<option value="${v.nome}">${v.nome}</option>`;
+        });
+    }
+
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar ao Menu (Esc)</button>
             <h2>📋 Histórico</h2>
+            
             <div class="filtros-periodo">
                 <button class="filtro-btn ativo" data-periodo="hoje" onclick="aplicarFiltroHistorico('hoje')">Hoje</button>
                 <button class="filtro-btn" data-periodo="mes" onclick="aplicarFiltroHistorico('mes')">Este Mês</button>
                 <button class="filtro-btn" data-periodo="personalizado" onclick="aplicarFiltroHistorico('personalizado')">Personalizado</button>
             </div>
+            
+            <div class="form-group">
+                <label>👤 Filtrar por Vendedor</label>
+                <select id="hist-vendedor" class="input-grande" onchange="buscarMovimentosHistorico(document.querySelector('.filtro-btn.ativo').dataset.periodo)">
+                    ${optionsVendedores}
+                </select>
+            </div>
+            
             <div class="range-custom" id="range-historico">
                 <div class="linha">
                     <label>De:</label>
@@ -515,6 +593,7 @@ async function renderizarHistorico() {
                 </div>
                 <button onclick="aplicarFiltroHistorico('personalizado', true)" class="btn-primario">Buscar</button>
             </div>
+            
             <div id="lista-historico" class="lista-movimentos"></div>
         </div>`;
     await buscarMovimentosHistorico('hoje');
@@ -545,11 +624,19 @@ async function buscarMovimentosHistorico(periodo) {
         range = obterRangePeriodo(periodo);
     }
 
-    const { data: movimentos, error } = await supabaseClient
+    const vendedorFiltro = document.getElementById('hist-vendedor')?.value || '';
+
+    let query = supabaseClient
         .from('movimentos').select('*')
         .gte('criado_em', range.inicio)
         .lte('criado_em', range.fim)
         .order('criado_em', { ascending: false });
+
+    if (vendedorFiltro) {
+        query = query.eq('vendedor', vendedorFiltro);
+    }
+
+    const { data: movimentos, error } = await query;
 
     if (error) { abrirModal('Erro', 'Erro: ' + error.message); return; }
 
@@ -609,18 +696,37 @@ function cancelarVenda(id) {
 }
 
 // ==========================================
-// 11. RELATÓRIO DE COMISSÕES COM FILTRO
+// 12. COMISSÕES COM FILTRO
 // ==========================================
 async function renderizarRelatorioComissoes() {
+    const { data: vendedores } = await supabaseClient
+        .from('vendedores').select('nome').order('nome');
+
+    let optionsVendedores = '<option value="">Todos os vendedores</option>';
+    if (vendedores && vendedores.length > 0) {
+        vendedores.forEach(v => {
+            optionsVendedores += `<option value="${v.nome}">${v.nome}</option>`;
+        });
+    }
+
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar ao Menu (Esc)</button>
             <h2>💰 Comissões</h2>
+            
             <div class="filtros-periodo">
                 <button class="filtro-btn ativo" data-periodo="hoje" onclick="aplicarFiltroComissao('hoje')">Hoje</button>
                 <button class="filtro-btn" data-periodo="mes" onclick="aplicarFiltroComissao('mes')">Este Mês</button>
                 <button class="filtro-btn" data-periodo="personalizado" onclick="aplicarFiltroComissao('personalizado')">Personalizado</button>
             </div>
+            
+            <div class="form-group">
+                <label>👤 Filtrar por Vendedor</label>
+                <select id="com-vendedor" class="input-grande" onchange="buscarComissoes(document.querySelector('.filtro-btn.ativo').dataset.periodo)">
+                    ${optionsVendedores}
+                </select>
+            </div>
+            
             <div class="range-custom" id="range-comissao">
                 <div class="linha">
                     <label>De:</label>
@@ -632,6 +738,7 @@ async function renderizarRelatorioComissoes() {
                 </div>
                 <button onclick="aplicarFiltroComissao('personalizado', true)" class="btn-primario">Buscar</button>
             </div>
+            
             <div id="lista-comissoes" class="lista-movimentos"></div>
         </div>`;
     await buscarComissoes('hoje');
@@ -662,12 +769,20 @@ async function buscarComissoes(periodo) {
         range = obterRangePeriodo(periodo);
     }
 
-    const { data: movimentos, error } = await supabaseClient
+    const vendedorFiltro = document.getElementById('com-vendedor')?.value || '';
+
+    let query = supabaseClient
         .from('movimentos')
         .select('vendedor, valor, comissao_valor, cancelado')
         .eq('tipo', 'venda').eq('cancelado', false)
         .gte('criado_em', range.inicio)
         .lte('criado_em', range.fim);
+
+    if (vendedorFiltro) {
+        query = query.eq('vendedor', vendedorFiltro);
+    }
+
+    const { data: movimentos, error } = await query;
 
     if (error) { abrirModal('Erro', 'Erro: ' + error.message); return; }
 
@@ -716,7 +831,7 @@ async function buscarComissoes(periodo) {
 }
 
 // ==========================================
-// 12. FECHAR CAIXA
+// 13. FECHAR CAIXA
 // ==========================================
 async function renderizarTelaFecharCaixa() {
     const { data: movimentos } = await supabaseClient
@@ -763,7 +878,7 @@ async function renderizarTelaFecharCaixa() {
 
             <div class="form-group">
                 <label>💵 Valor Contado (R$)</label>
-                <input type="number" id="fechamento-valor-contado" placeholder="0,00" step="0.01" class="input-grande" onkeydown="if(event.key==='Enter') confirmarFechamento(${dinheiroEsperado})">
+                <input type="number" id="fechamento-valor-contado" placeholder="0,00" step="0.01" class="input-grande" onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmarFechamento(${dinheiroEsperado});}">
             </div>
 
             <button onclick="confirmarFechamento(${dinheiroEsperado})" class="btn-primario btn-pill">FECHAR CAIXA <span class="kbd-hint">Enter</span></button>
