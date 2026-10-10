@@ -518,14 +518,7 @@ async function carregarDashboard(periodo) {
         inicioAnterior = new Date(fimAnterior.getTime() - 6 * 24 * 3600000);
         inicioAnterior.setHours(0,0,0,0);
         labelAtual = 'últimos 7 dias'; labelAnterior = '7 dias anteriores';
-    } else if (periodo === '30dias') {
-        fim = new Date();
-        inicio = new Date(agora.getTime() - 29 * 24 * 3600000);
-        inicio.setHours(0,0,0,0);
-        fimAnterior = new Date(inicio.getTime() - 1);
-        inicioAnterior = new Date(fimAnterior.getTime() - 29 * 24 * 3600000);
-        inicioAnterior.setHours(0,0,0,0);
-        labelAtual = 'últimos 30 dias'; labelAnterior = '30 dias anteriores';
+
     } else if (periodo === 'mes') {
         inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
         fim = new Date();
@@ -697,8 +690,7 @@ async function carregarDashboard(periodo) {
         let dias;
         if (mesEspecificoAtivo) {
             dias = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes + 1, 0).getDate();
-        } else if (periodo === '7dias') dias = 7;
-        else if (periodo === '30dias') dias = 30;
+                } else if (periodo === '7dias') dias = 7;
         else if (periodo === 'mes') dias = agora.getDate();
         else dias = new Date(agora.getFullYear(), agora.getMonth(), 0).getDate();
 
@@ -707,7 +699,7 @@ async function carregarDashboard(periodo) {
             if (mesEspecificoAtivo) {
                 dataDia = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes, i + 1);
                 dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
-            } else if (periodo === '7dias' || periodo === '30dias') {
+                        } else if (periodo === '7dias') {
                 dataDia = new Date(inicio.getTime() + i * 24 * 3600000);
                 dataAnt = new Date(inicioAnterior.getTime() + i * 24 * 3600000);
             } else if (periodo === 'mes') {
@@ -783,7 +775,6 @@ function renderizarDashboardPC(dados) {
     const periodos = [
         { id: 'hoje', label: 'Hoje' },
         { id: '7dias', label: '7 dias' },
-        { id: '30dias', label: '30 dias' },
         { id: 'mes', label: 'Este mês' },
         { id: 'mesPassado', label: 'Mês passado' }
     ];
@@ -2175,18 +2166,31 @@ async function abrirSeletorMes() {
         .select('criado_em').eq('tipo', 'venda').eq('cancelado', false)
         .order('criado_em', { ascending: false });
     
+    const agora = new Date();
+    const mesAtualKey = `${agora.getFullYear()}-${agora.getMonth()}`;
+    
     const mesesSet = new Set();
     (movimentos || []).forEach(m => {
         const d = new Date(m.criado_em);
         mesesSet.add(`${d.getFullYear()}-${d.getMonth()}`);
     });
     
+    if (mesesSet.size === 0) {
+        abrirModal('Aviso', 'Nenhuma venda registrada ainda. Faça sua primeira venda para usar o filtro por mês.');
+        return;
+    }
+    
     const opcoes = [
-        { valor: 'TODOS', label: '🔄 Remover filtro de mês' },
+        { valor: 'TODOS', label: '🔄 Ver período normal' },
         ...[...mesesSet].sort().reverse().map(key => {
             const [ano, mes] = key.split('-').map(Number);
             const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            return { valor: key, label: label.charAt(0).toUpperCase() + label.slice(1) };
+            const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+            const ehMesAtual = key === mesAtualKey;
+            return { 
+                valor: key, 
+                label: ehMesAtual ? `📅 ${labelCap} (em andamento)` : `📅 ${labelCap}`
+            };
         })
     ];
     
@@ -2252,4 +2256,12 @@ function desenharGraficoCategorias(catValor) {
             }
         }
     });
+}
+// ==========================================
+// INTERAÇÃO COM FILTROS DO DASHBOARD
+// ==========================================
+async function alterarPeriodoDashboard(periodo) {
+    mesEspecificoAtivo = null;
+    periodoDashboardSelecionado = periodo;
+    await carregarDashboard(periodo);
 }
