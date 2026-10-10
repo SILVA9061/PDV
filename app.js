@@ -419,96 +419,7 @@ async function renderizarMenuPrincipal() {
     menuAtivoId = 'dashboard';
     renderizarSidebar();
     await atualizarValorGaveta();
-
-    // Buscar dados do dia
-    const { data: movimentos } = await supabaseClient.from('movimentos').select('*')
-        .eq('caixa_id', caixaAtual.id).eq('cancelado', false);
-
-    const vendas = (movimentos || []).filter(m => m.tipo === 'venda');
-    const totalVendas = vendas.reduce((acc, m) => acc + parseFloat(m.valor), 0);
-    const qtdVendas = vendas.length;
-    const ticket = qtdVendas > 0 ? totalVendas / qtdVendas : 0;
-    const totalComissoes = vendas.reduce((acc, m) => acc + parseFloat(m.comissao_valor || 0), 0);
-
-    // Vendas por hora (últimas 7h)
-    const agora = new Date();
-    const porHora = {};
-    for (let i = 6; i >= 0; i--) {
-        const h = new Date(agora.getTime() - i * 3600000).getHours();
-        porHora[h] = 0;
-    }
-    vendas.forEach(v => {
-        const h = new Date(v.criado_em).getHours();
-        if (porHora[h] !== undefined) porHora[h] += parseFloat(v.valor);
-    });
-    const horasLabels = Object.keys(porHora).sort((a,b)=>a-b).map(h => String(h).padStart(2,'0') + 'h');
-    const horasValores = Object.keys(porHora).sort((a,b)=>a-b).map(h => porHora[h]);
-
-    // Buscar últimos caixas (últimos 7 dias)
-    const seteDiasAtras = new Date(agora.getTime() - 7 * 24 * 3600000).toISOString();
-    const { data: caixasSemana } = await supabaseClient.from('caixas')
-        .select('id, aberto_em').gte('aberto_em', seteDiasAtras);
-    const idsCaixas = (caixasSemana || []).map(c => c.id);
-    let vendasSemana = [];
-    if (idsCaixas.length > 0) {
-        const { data } = await supabaseClient.from('movimentos').select('valor, criado_em')
-            .in('caixa_id', idsCaixas).eq('tipo', 'venda').eq('cancelado', false);
-        vendasSemana = data || [];
-    }
-    const porDia = {};
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date(agora.getTime() - i * 24 * 3600000);
-        const key = d.toISOString().slice(0,10);
-        porDia[key] = 0;
-    }
-    vendasSemana.forEach(v => {
-        const key = new Date(v.criado_em).toISOString().slice(0,10);
-        if (porDia[key] !== undefined) porDia[key] += parseFloat(v.valor);
-    });
-    const diasLabels = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    const diasChaves = Object.keys(porDia).sort();
-    const diasNomes = diasChaves.map(k => diasLabels[new Date(k + 'T12:00:00').getDay()]);
-    const diasValores = diasChaves.map(k => porDia[k]);
-
-    // Comissões por vendedor (para dashboard)
-    const comissPorVendedor = {};
-    vendas.forEach(v => {
-        const nome = v.vendedor || 'Sem nome';
-        if (!comissPorVendedor[nome]) comissPorVendedor[nome] = 0;
-        comissPorVendedor[nome] += parseFloat(v.comissao_valor || 0);
-    });
-    const topVendedores = Object.entries(comissPorVendedor)
-        .sort((a,b) => b[1] - a[1]).slice(0, 4);
-
-    // Top produtos
-    const prodPorQtd = {};
-    vendas.forEach(v => {
-        const p = v.produto || 'Produto';
-        prodPorQtd[p] = (prodPorQtd[p] || 0) + 1;
-    });
-    const topProdutos = Object.entries(prodPorQtd)
-        .sort((a,b) => b[1] - a[1]).slice(0, 5);
-
-    // Últimas 5 vendas
-    const ultimasVendas = vendas
-        .sort((a,b) => new Date(b.criado_em) - new Date(a.criado_em))
-        .slice(0, 5);
-
-    // Layout responsivo
-    if (DISPOSITIVO === 'pc') {
-        renderizarDashboardPC({
-            totalVendas, qtdVendas, ticket, totalComissoes,
-            horasLabels, horasValores,
-            diasLabels: diasNomes, diasValores,
-            topVendedores, topProdutos, ultimasVendas
-        });
-    } else {
-        renderizarDashboardMobile({
-            totalVendas, qtdVendas, ticket, totalComissoes,
-            diasLabels: diasNomes, diasValores,
-            topProdutos, ultimasVendas
-        });
-    }
+    await carregarDashboard(periodoDashboardSelecionado);
 }
 
 // -------------- DASHBOARD MOBILE --------------
@@ -586,114 +497,503 @@ function renderizarDashboardMobile({ totalVendas, qtdVendas, ticket, totalComiss
 }
 
 // -------------- DASHBOARD PC --------------
-function renderizarDashboardPC({ totalVendas, qtdVendas, ticket, totalComissoes, horasLabels, horasValores, diasLabels, diasValores, topVendedores, topProdutos, ultimasVendas }) {
+let periodoDashboardSelecionado = 'hoje';
+let mesEspecificoAtivo = null;
+
+async function carregarDashboard(periodo) {
+    const agora = new Date();
+    let inicio, fim, inicioAnterior, fimAnterior, labelAtual, labelAnterior;
+
+    if (periodo === 'hoje') {
+        inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
+        fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59);
+        inicioAnterior = new Date(inicio.getTime() - 24 * 3600000);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        labelAtual = 'hoje'; labelAnterior = 'ontem';
+    } else if (periodo === '7dias') {
+        fim = new Date();
+        inicio = new Date(agora.getTime() - 6 * 24 * 3600000);
+        inicio.setHours(0,0,0,0);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getTime() - 6 * 24 * 3600000);
+        inicioAnterior.setHours(0,0,0,0);
+        labelAtual = 'últimos 7 dias'; labelAnterior = '7 dias anteriores';
+    } else if (periodo === '30dias') {
+        fim = new Date();
+        inicio = new Date(agora.getTime() - 29 * 24 * 3600000);
+        inicio.setHours(0,0,0,0);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getTime() - 29 * 24 * 3600000);
+        inicioAnterior.setHours(0,0,0,0);
+        labelAtual = 'últimos 30 dias'; labelAnterior = '30 dias anteriores';
+    } else if (periodo === 'mes') {
+        inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
+        fim = new Date();
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
+        labelAtual = 'este mês'; labelAnterior = 'mês passado';
+    } else if (periodo === 'mesPassado') {
+        inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0);
+        fim = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
+        labelAtual = 'mês passado'; labelAnterior = 'mês retrasado';
+    }
+
+    const [atualResp, anteriorResp] = await Promise.all([
+        supabaseClient.from('movimentos').select('valor, comissao_valor, criado_em, produto')
+            .eq('tipo','venda').eq('cancelado', false)
+            .gte('criado_em', inicio.toISOString()).lte('criado_em', fim.toISOString()),
+        supabaseClient.from('movimentos').select('valor, comissao_valor, criado_em')
+            .eq('tipo','venda').eq('cancelado', false)
+            .gte('criado_em', inicioAnterior.toISOString()).lte('criado_em', fimAnterior.toISOString())
+    ]);
+
+    const movAtual = atualResp.data || [];
+    const movAnterior = anteriorResp.data || [];
+
+    const totalVendas = movAtual.reduce((a,m) => a + parseFloat(m.valor), 0);
+    const qtdVendas = movAtual.length;
+    const ticket = qtdVendas > 0 ? totalVendas / qtdVendas : 0;
+    const totalComissoes = movAtual.reduce((a,m) => a + parseFloat(m.comissao_valor || 0), 0);
+    const totalVendasAnt = movAnterior.reduce((a,m) => a + parseFloat(m.valor), 0);
+    const qtdVendasAnt = movAnterior.length;
+    const ticketAnt = qtdVendasAnt > 0 ? totalVendasAnt / qtdVendasAnt : 0;
+    const totalComissoesAnt = movAnterior.reduce((a,m) => a + parseFloat(m.comissao_valor || 0), 0);
+
+    const calcVar = (a, b) => b === 0 ? (a > 0 ? 100 : null) : ((a - b) / b) * 100;
+    const varVendas = calcVar(totalVendas, totalVendasAnt);
+    const varQtd = calcVar(qtdVendas, qtdVendasAnt);
+    const varTicket = calcVar(ticket, ticketAnt);
+    const varComissao = calcVar(totalComissoes, totalComissoesAnt);
+
+    const labels = [], valoresAtual = [], valoresAnterior = [];
+    if (periodo === 'hoje') {
+        for (let h = 0; h < 24; h++) {
+            labels.push(String(h).padStart(2,'0') + 'h');
+            valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).getHours() === h).reduce((a,m) => a + parseFloat(m.valor), 0));
+            valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).getHours() === h).reduce((a,m) => a + parseFloat(m.valor), 0));
+        }
+    } else {
+        const dias = periodo === '7dias' ? 7 : periodo === '30dias' ? 30 : 
+                     periodo === 'mes' ? agora.getDate() : new Date(agora.getFullYear(), agora.getMonth(), 0).getDate();
+        for (let i = 0; i < dias; i++) {
+            let dataDia;
+            if (periodo === '7dias' || periodo === '30dias') dataDia = new Date(inicio.getTime() + i * 24 * 3600000);
+            else if (periodo === 'mes') dataDia = new Date(agora.getFullYear(), agora.getMonth(), i + 1);
+            else { const m = new Date(agora.getFullYear(), agora.getMonth() - 1, 1); dataDia = new Date(m.getFullYear(), m.getMonth(), i + 1); }
+            
+            const key = dataDia.toISOString().slice(0,10);
+            labels.push(periodo === '7dias' ? ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dataDia.getDay()] : String(dataDia.getDate()).padStart(2,'0'));
+            valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === key).reduce((a,m) => a + parseFloat(m.valor), 0));
+            
+            let dataAnt;
+            if (periodo === '7dias' || periodo === '30dias') dataAnt = new Date(inicioAnterior.getTime() + i * 24 * 3600000);
+            else dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
+            const keyAnt = dataAnt.toISOString().slice(0,10);
+            valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === keyAnt).reduce((a,m) => a + parseFloat(m.valor), 0));
+        }
+    }
+
+    const prodQtd = {};
+    movAtual.forEach(m => { const p = m.produto || 'Produto'; prodQtd[p] = (prodQtd[p] || 0) + 1; });
+    const topProdutos = Object.entries(prodQtd).sort((a,b) => b[1] - a[1]).slice(0,5).map(([nome, qtd]) => ({ nome, qtd }));
+
+    const dados = {
+        totalVendas, qtdVendas, ticket, totalComissoes,
+        varVendas, varQtd, varTicket, varComissao,
+        labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior, topProdutos
+    };
+
+    if (DISPOSITIVO === 'pc') renderizarDashboardPC(dados);
+    else renderizarDashboardMobile(dados);
+}
+
+async function carregarDashboard(periodo) {
+    const agora = new Date();
+    let inicio, fim, inicioAnterior, fimAnterior, labelAtual, labelAnterior;
+
+    // Mês específico escolhido pelo usuário
+    if (mesEspecificoAtivo) {
+        inicio = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes, 1, 0, 0, 0);
+        fim = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes + 1, 0, 23, 59, 59);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
+        labelAtual = mesEspecificoAtivo.label;
+        labelAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1)
+            .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    } else if (periodo === 'hoje') {
+        inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
+        fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59);
+        inicioAnterior = new Date(inicio.getTime() - 24 * 3600000);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        labelAtual = 'hoje'; labelAnterior = 'ontem';
+    } else if (periodo === '7dias') {
+        fim = new Date();
+        inicio = new Date(agora.getTime() - 6 * 24 * 3600000);
+        inicio.setHours(0,0,0,0);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getTime() - 6 * 24 * 3600000);
+        inicioAnterior.setHours(0,0,0,0);
+        labelAtual = 'últimos 7 dias'; labelAnterior = '7 dias anteriores';
+    } else if (periodo === '30dias') {
+        fim = new Date();
+        inicio = new Date(agora.getTime() - 29 * 24 * 3600000);
+        inicio.setHours(0,0,0,0);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getTime() - 29 * 24 * 3600000);
+        inicioAnterior.setHours(0,0,0,0);
+        labelAtual = 'últimos 30 dias'; labelAnterior = '30 dias anteriores';
+    } else if (periodo === 'mes') {
+        inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
+        fim = new Date();
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
+        labelAtual = 'este mês'; labelAnterior = 'mês passado';
+    } else if (periodo === 'mesPassado') {
+        inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0);
+        fim = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
+        labelAtual = 'mês passado'; labelAnterior = 'mês retrasado';
+    }
+
+    const [atualResp, anteriorResp] = await Promise.all([
+        supabaseClient.from('movimentos').select('valor, comissao_valor, criado_em, produto, categoria, vendedor')
+            .eq('tipo','venda').eq('cancelado', false)
+            .gte('criado_em', inicio.toISOString()).lte('criado_em', fim.toISOString()),
+        supabaseClient.from('movimentos').select('valor, comissao_valor, criado_em')
+            .eq('tipo','venda').eq('cancelado', false)
+            .gte('criado_em', inicioAnterior.toISOString()).lte('criado_em', fimAnterior.toISOString())
+    ]);
+
+    const movAtual = atualResp.data || [];
+    const movAnterior = anteriorResp.data || [];
+
+    const totalVendas = movAtual.reduce((a,m) => a + parseFloat(m.valor), 0);
+    const qtdVendas = movAtual.length;
+    const ticket = qtdVendas > 0 ? totalVendas / qtdVendas : 0;
+    const totalComissoes = movAtual.reduce((a,m) => a + parseFloat(m.comissao_valor || 0), 0);
+    const totalVendasAnt = movAnterior.reduce((a,m) => a + parseFloat(m.valor), 0);
+    const qtdVendasAnt = movAnterior.length;
+    const ticketAnt = qtdVendasAnt > 0 ? totalVendasAnt / qtdVendasAnt : 0;
+    const totalComissoesAnt = movAnterior.reduce((a,m) => a + parseFloat(m.comissao_valor || 0), 0);
+
+    const calcVar = (a, b) => b === 0 ? (a > 0 ? 100 : null) : ((a - b) / b) * 100;
+    const varVendas = calcVar(totalVendas, totalVendasAnt);
+    const varQtd = calcVar(qtdVendas, qtdVendasAnt);
+    const varTicket = calcVar(ticket, ticketAnt);
+    const varComissao = calcVar(totalComissoes, totalComissoesAnt);
+
+    // Labels e valores do gráfico
+    const labels = [], valoresAtual = [], valoresAnterior = [];
+    if (periodo === 'hoje' && !mesEspecificoAtivo) {
+        for (let h = 0; h < 24; h++) {
+            labels.push(String(h).padStart(2,'0') + 'h');
+            valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).getHours() === h).reduce((a,m) => a + parseFloat(m.valor), 0));
+            valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).getHours() === h).reduce((a,m) => a + parseFloat(m.valor), 0));
+        }
+    } else {
+        let dias;
+        if (mesEspecificoAtivo) {
+            dias = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes + 1, 0).getDate();
+        } else if (periodo === '7dias') dias = 7;
+        else if (periodo === '30dias') dias = 30;
+        else if (periodo === 'mes') dias = agora.getDate();
+        else dias = new Date(agora.getFullYear(), agora.getMonth(), 0).getDate();
+
+        for (let i = 0; i < dias; i++) {
+            let dataDia, dataAnt;
+            if (mesEspecificoAtivo) {
+                dataDia = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes, i + 1);
+                dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
+            } else if (periodo === '7dias' || periodo === '30dias') {
+                dataDia = new Date(inicio.getTime() + i * 24 * 3600000);
+                dataAnt = new Date(inicioAnterior.getTime() + i * 24 * 3600000);
+            } else if (periodo === 'mes') {
+                dataDia = new Date(agora.getFullYear(), agora.getMonth(), i + 1);
+                dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
+            } else {
+                const m = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+                dataDia = new Date(m.getFullYear(), m.getMonth(), i + 1);
+                dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
+            }
+            
+            const key = dataDia.toISOString().slice(0,10);
+            labels.push(periodo === '7dias' ? ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dataDia.getDay()] : String(dataDia.getDate()).padStart(2,'0'));
+            valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === key).reduce((a,m) => a + parseFloat(m.valor), 0));
+            
+            const keyAnt = dataAnt.toISOString().slice(0,10);
+            valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === keyAnt).reduce((a,m) => a + parseFloat(m.valor), 0));
+        }
+    }
+
+    // Top produtos
+    const prodQtd = {}, prodValor = {};
+    movAtual.forEach(m => {
+        const p = m.produto || 'Produto';
+        prodQtd[p] = (prodQtd[p] || 0) + 1;
+        prodValor[p] = (prodValor[p] || 0) + parseFloat(m.valor);
+    });
+    const topProdutos = Object.entries(prodQtd).sort((a,b) => b[1] - a[1]).slice(0,5).map(([nome, qtd]) => ({ nome, qtd, valor: prodValor[nome] }));
+
+    // Top vendedores
+    const vendQtd = {}, vendValor = {};
+    movAtual.forEach(m => {
+        const v = m.vendedor || 'Sem nome';
+        vendQtd[v] = (vendQtd[v] || 0) + 1;
+        vendValor[v] = (vendValor[v] || 0) + parseFloat(m.valor);
+    });
+    const topVendedores = Object.entries(vendValor).sort((a,b) => b[1] - a[1]).slice(0,5).map(([nome, valor]) => ({ nome, valor, qtd: vendQtd[nome] }));
+    const maxVendedor = topVendedores[0]?.valor || 1;
+
+    // Categorias
+    const catValor = {};
+    movAtual.forEach(m => {
+        const c = m.categoria || 'Outros';
+        catValor[c] = (catValor[c] || 0) + parseFloat(m.valor);
+    });
+
+    // Sparkline (últimos 7 pontos)
+    const sparkline = valoresAtual.slice(-7);
+
+    const dados = {
+        totalVendas, qtdVendas, ticket, totalComissoes,
+        varVendas, varQtd, varTicket, varComissao,
+        labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior,
+        topProdutos, topVendedores, maxVendedor, catValor, sparkline
+    };
+
+    if (DISPOSITIVO === 'pc') renderizarDashboardPC(dados);
+    else renderizarDashboardMobile(dados);
+}
+
+function badgeVariacao(valor, labelAnterior) {
+    if (valor === null) return `<span class="kpi-variacao neutra">— sem base</span>`;
+    const positivo = valor >= 0;
+    return `<span class="kpi-variacao ${positivo ? 'positiva' : 'negativa'}">
+        <span class="seta">${positivo ? '▲' : '▼'}</span> ${positivo ? '+' : ''}${valor.toFixed(1)}% 
+        <span style="opacity:0.7; font-weight:500;">vs ${labelAnterior}</span>
+    </span>`;
+}
+
+function renderizarDashboardPC(dados) {
+    const { totalVendas, qtdVendas, ticket, totalComissoes, varVendas, varQtd, varTicket, varComissao, labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior, topProdutos, topVendedores, maxVendedor, catValor, sparkline } = dados;
+
+    const periodos = [
+        { id: 'hoje', label: 'Hoje' },
+        { id: '7dias', label: '7 dias' },
+        { id: '30dias', label: '30 dias' },
+        { id: 'mes', label: 'Este mês' },
+        { id: 'mesPassado', label: 'Mês passado' }
+    ];
+    const filtrosHtml = periodos.map(p => 
+        `<button class="filtro-periodo-btn ${!mesEspecificoAtivo && p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
+    ).join('');
+
+    const categoriasHTML = Object.keys(catValor).length > 0 
+        ? `<div class="pc-analise-card">
+            <div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div>
+            <div style="position:relative; height:200px;"><canvas id="grafico-categorias"></canvas></div>
+        </div>`
+        : `<div class="pc-analise-card"><div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div><p class="pc-vazio">Sem dados no período</p></div>`;
+
     document.getElementById('app-container').innerHTML = `
         <div class="pc-dashboard">
             <div class="pc-dashboard-header">
                 <div>
                     <h1 class="pc-titulo">Dashboard</h1>
-                    <p class="pc-subtitulo">Visão geral do dia</p>
+                    <p class="pc-subtitulo">Visão geral · ${labelAtual}</p>
                 </div>
+            </div>
+
+            <div class="dashboard-filtros-wrapper">
+                <div class="dashboard-filtros">${filtrosHtml}</div>
+                <button class="btn-filtro-extra ${mesEspecificoAtivo ? 'ativo' : ''}" onclick="abrirSeletorMes()">
+                    📅 ${mesEspecificoAtivo ? mesEspecificoAtivo.label : 'Mês específico'}
+                </button>
+                ${mesEspecificoAtivo ? `<button class="btn-filtro-extra" onclick="mesEspecificoAtivo=null; carregarDashboard(periodoDashboardSelecionado);">✕ Limpar</button>` : ''}
             </div>
 
             <div class="pc-kpis">
                 <div class="pc-kpi pc-kpi-destaque">
-                    <span class="kpi-label">VENDAS HOJE</span>
+                    <span class="kpi-label">VENDAS · ${labelAtual.toUpperCase()}</span>
                     <strong class="kpi-valor">${formatarMoeda(totalVendas)}</strong>
+                    ${badgeVariacao(varVendas, labelAnterior)}
+                    <div class="kpi-sparkline">${gerarSparkline(sparkline)}</div>
                 </div>
                 <div class="pc-kpi">
                     <span class="kpi-label">TICKET MÉDIO</span>
                     <strong class="kpi-valor-branco">${formatarMoeda(ticket)}</strong>
+                    ${badgeVariacao(varTicket, labelAnterior)}
                 </div>
                 <div class="pc-kpi">
-                    <span class="kpi-label">VENDAS</span>
+                    <span class="kpi-label">Nº DE VENDAS</span>
                     <strong class="kpi-valor-branco">${qtdVendas}</strong>
+                    ${badgeVariacao(varQtd, labelAnterior)}
                 </div>
                 <div class="pc-kpi">
                     <span class="kpi-label">COMISSÕES</span>
                     <strong class="kpi-valor">${formatarMoeda(totalComissoes)}</strong>
+                    ${badgeVariacao(varComissao, labelAnterior)}
                 </div>
             </div>
 
             <div class="pc-linha-graficos">
                 <div class="pc-card-grafico-grande">
                     <div class="pc-card-header">
-                        <span class="pc-card-titulo">VENDAS ÚLTIMOS 7 DIAS</span>
+                        <span class="pc-card-titulo">VENDAS · ${labelAtual.toUpperCase()}</span>
+                    </div>
+                    <div class="grafico-legenda">
+                        <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
+                        <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
                     </div>
                     <div class="pc-canvas-grande"><canvas id="grafico-pc-semana"></canvas></div>
                 </div>
                 <div class="pc-card-grafico-pequeno">
-                    <div class="pc-card-header">
-                        <span class="pc-card-titulo">TOP PRODUTOS</span>
-                    </div>
+                    <div class="pc-card-header"><span class="pc-card-titulo">TOP PRODUTOS</span></div>
                     <div class="pc-lista-top">
                         ${topProdutos.length > 0 ? topProdutos.map((p, i) => `
                             <div class="pc-top-item">
                                 <span class="pc-top-rank">${i+1}</span>
-                                <span class="pc-top-nome">${p[0]}</span>
-                                <span class="pc-top-qtd">${p[1]}</span>
+                                <span class="pc-top-nome">${p.nome}</span>
+                                <span class="pc-top-qtd">${p.qtd}</span>
                             </div>
-                        `).join('') : '<p class="pc-vazio">Nenhuma venda ainda</p>'}
+                        `).join('') : '<p class="pc-vazio">Nenhuma venda no período</p>'}
                     </div>
                 </div>
+            </div>
+
+            <div class="pc-analise-row">
+                <div class="pc-analise-card">
+                    <div class="pc-card-header"><span class="pc-card-titulo">TOP VENDEDORES</span></div>
+                    <div class="pc-lista-top">
+                        ${topVendedores.length > 0 ? topVendedores.map(v => {
+                            const pct = (v.valor / maxVendedor) * 100;
+                            return `
+                            <div class="pc-vendedor-item" style="flex-direction:column; align-items:stretch;">
+                                <div style="display:flex; align-items:center; gap:0.75rem;">
+                                    <div class="pc-vendedor-avatar">${v.nome.charAt(0).toUpperCase()}</div>
+                                    <div class="pc-vendedor-info">
+                                        <div class="pc-vendedor-nome">${v.nome}</div>
+                                        <div class="pc-vendedor-detalhe">${v.qtd} venda${v.qtd !== 1 ? 's' : ''}</div>
+                                    </div>
+                                    <div class="pc-vendedor-valor">${formatarMoeda(v.valor)}</div>
+                                </div>
+                                <div class="pc-vendedor-barra"><div class="pc-vendedor-barra-fill" style="width:${pct}%"></div></div>
+                            </div>`;
+                        }).join('') : '<p class="pc-vazio">Nenhuma venda no período</p>'}
+                    </div>
+                </div>
+                ${categoriasHTML}
             </div>
 
             <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda-pc">🛒 NOVA VENDA</button>
         </div>`;
 
-    // Painel direito com últimas vendas
-    document.getElementById('pc-painel-direito').innerHTML = `
-        <div class="pc-painel-header">
-            <span class="pc-painel-titulo">ATIVIDADE RECENTE</span>
-        </div>
-        <div class="pc-painel-lista">
-            ${ultimasVendas.length > 0 ? ultimasVendas.map(v => `
-                <div class="pc-atividade-item">
-                    <span class="pc-atividade-icone">🛒</span>
-                    <div class="pc-atividade-info">
-                        <span class="pc-atividade-produto">${v.produto || 'Produto'}</span>
-                        <span class="pc-atividade-hora">${new Date(v.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</span>
-                    </div>
-                    <span class="pc-atividade-valor">${formatarMoeda(v.valor)}</span>
-                </div>
-            `).join('') : '<p class="pc-vazio">Sem vendas</p>'}
-        </div>
-    `;
-    document.getElementById('pc-painel-direito').classList.add('ativo');
-
-    // Gráfico PC
     setTimeout(() => {
-        const ctx = document.getElementById('grafico-pc-semana');
-        if (!ctx) return;
-        destruirGrafico('pc-semana');
-        graficosAtivos['pc-semana'] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: diasLabels,
-                datasets: [{
-                    data: diasValores,
-                    borderColor: '#FACC15',
-                    backgroundColor: 'rgba(250, 204, 21, 0.08)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointBackgroundColor: '#FACC15',
-                    pointBorderColor: '#0A0A0A',
-                    pointBorderWidth: 2,
-                    pointRadius: 5
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => formatarMoeda(c.parsed.y) } } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8A8A8A', callback: (v) => 'R$' + v } },
-                    x: { grid: { display: false }, ticks: { color: '#8A8A8A' } }
-                }
-            }
-        });
+        desenharGraficoDashboard('grafico-pc-semana', labels, valoresAtual, valoresAnterior, labelAnterior);
+        if (Object.keys(catValor).length > 0) desenharGraficoCategorias(catValor);
     }, 50);
+}
+
+function renderizarDashboardMobile(dados) {
+    const { totalVendas, qtdVendas, ticket, varVendas, labelAnterior, labelAtual, labels, valoresAtual, valoresAnterior } = dados;
+
+    const periodos = [
+        { id: 'hoje', label: 'Hoje' },
+        { id: '7dias', label: '7 dias' },
+        { id: '30dias', label: '30 dias' },
+        { id: 'mes', label: 'Este mês' },
+        { id: 'mesPassado', label: 'Mês passado' }
+    ];
+    const filtrosHtml = periodos.map(p => 
+        `<button class="filtro-periodo-btn ${p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
+    ).join('');
+
+    document.getElementById('app-container').innerHTML = `
+        <div class="tela-menu">
+            <div class="dashboard-filtros">${filtrosHtml}</div>
+            <div class="card-resumo card-destaque">
+                <span>VENDAS · ${labelAtual.toUpperCase()}</span>
+                <strong>${formatarMoeda(totalVendas)}</strong>
+                ${badgeVariacao(varVendas, labelAnterior)}
+                <div class="metricas-mini">
+                    <span>${qtdVendas} venda${qtdVendas !== 1 ? 's' : ''}</span>
+                    <span>·</span>
+                    <span>Ticket ${formatarMoeda(ticket)}</span>
+                </div>
+            </div>
+            <div class="card-grafico">
+                <div class="card-grafico-header"><span class="card-grafico-titulo">Vendas · ${labelAtual}</span></div>
+                <div class="grafico-legenda">
+                    <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
+                    <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
+                </div>
+                <div class="card-grafico-canvas"><canvas id="grafico-semana"></canvas></div>
+            </div>
+            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda">NOVA VENDA 🛒</button>
+            <div class="grid-botoes-3">
+                <button onclick="renderizarTelaSangria()" class="btn-neutro"><span class="icone-btn">📤</span><span>Sangria</span></button>
+                <button onclick="renderizarTelaSuprimento()" class="btn-neutro"><span class="icone-btn">📥</span><span>Suprimento</span></button>
+                <button onclick="renderizarHistorico()" class="btn-neutro"><span class="icone-btn">📋</span><span>Histórico</span></button>
+                <button onclick="renderizarRelatorioComissoes()" class="btn-neutro"><span class="icone-btn">💰</span><span>Comissões</span></button>
+                <button onclick="renderizarTelaVendedores()" class="btn-neutro"><span class="icone-btn">👥</span><span>Vendedores</span></button>
+                <button onclick="renderizarTelaProdutos()" class="btn-neutro"><span class="icone-btn">📦</span><span>Produtos</span></button>
+            </div>
+            <button onclick="renderizarTelaFecharCaixa()" class="btn-fechar-caixa">🔒 Fechar Caixa</button>
+        </div>`;
+    setTimeout(() => desenharGraficoDashboard('grafico-semana', labels, valoresAtual, valoresAnterior, labelAnterior), 50);
+}
+
+function desenharGraficoDashboard(canvasId, labels, valoresAtual, valoresAnterior, labelAnterior) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    destruirGrafico(canvasId);
+
+    const datasets = [{
+        label: 'Atual',
+        data: valoresAtual,
+        borderColor: '#FACC15',
+        backgroundColor: 'rgba(250, 204, 21, 0.10)',
+        borderWidth: 3,
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#FACC15',
+        pointBorderColor: '#0A0A0A',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        order: 1
+    }];
+    if (valoresAnterior && valoresAnterior.some(v => v > 0)) {
+        datasets.push({
+            label: labelAnterior, data: valoresAnterior,
+            borderColor: 'rgba(138, 138, 138, 0.55)', backgroundColor: 'transparent',
+            borderWidth: 2, borderDash: [6, 4], tension: 0.4, fill: false,
+            pointBackgroundColor: 'rgba(138, 138, 138, 0.6)', pointRadius: 3, order: 2
+        });
+    }
+
+    graficosAtivos[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1A1A1A', borderColor: '#333', borderWidth: 1,
+                    titleColor: '#FFF', bodyColor: '#FFF', padding: 10, cornerRadius: 8,
+                    callbacks: { label: (c) => `${c.dataset.label}: ${formatarMoeda(c.parsed.y)}` }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8A8A8A', font: { size: 10, weight: '600' }, callback: (v) => v >= 1000 ? 'R$' + (v/1000).toFixed(1) + 'k' : 'R$' + v } },
+                x: { grid: { display: false }, ticks: { color: '#8A8A8A', font: { size: 10, weight: '600' }, maxRotation: 0, autoSkipPadding: 15 } }
+            }
+        }
+    });
 }
 // ==========================================
 // 10. NOVA VENDA
@@ -1865,5 +2165,91 @@ async function confirmarFechamento(dinheiroEsperado) {
         document.getElementById('pc-painel-direito').classList.remove('ativo');
         abrirModal('Sucesso', 'Caixa fechado!');
         renderizarTelaAbrirCaixa();
+    });
+}
+// ==========================================
+// SELETOR DE MÊS ESPECÍFICO
+// ==========================================
+async function abrirSeletorMes() {
+    const { data: movimentos } = await supabaseClient.from('movimentos')
+        .select('criado_em').eq('tipo', 'venda').eq('cancelado', false)
+        .order('criado_em', { ascending: false });
+    
+    const mesesSet = new Set();
+    (movimentos || []).forEach(m => {
+        const d = new Date(m.criado_em);
+        mesesSet.add(`${d.getFullYear()}-${d.getMonth()}`);
+    });
+    
+    const opcoes = [
+        { valor: 'TODOS', label: '🔄 Remover filtro de mês' },
+        ...[...mesesSet].sort().reverse().map(key => {
+            const [ano, mes] = key.split('-').map(Number);
+            const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            return { valor: key, label: label.charAt(0).toUpperCase() + label.slice(1) };
+        })
+    ];
+    
+    abrirSeletor('Escolha o mês', opcoes, '', (valor) => {
+        if (valor === 'TODOS') {
+            mesEspecificoAtivo = null;
+        } else {
+            const [ano, mes] = valor.split('-').map(Number);
+            const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            mesEspecificoAtivo = { ano, mes, label: label.charAt(0).toUpperCase() + label.slice(1) };
+        }
+        carregarDashboard(periodoDashboardSelecionado);
+    });
+}
+
+// ==========================================
+// SPARKLINE (mini gráfico no KPI)
+// ==========================================
+function gerarSparkline(valores) {
+    if (!valores || valores.length === 0) return '';
+    const max = Math.max(...valores, 1);
+    const w = 100, h = 40;
+    const stepX = w / Math.max(valores.length - 1, 1);
+    let pathFill = `M 0 ${h}`;
+    let pathLine = '';
+    valores.forEach((v, i) => {
+        const x = i * stepX;
+        const y = h - (v/max)*h;
+        pathFill += ` L ${x} ${y}`;
+        pathLine += (i === 0 ? `M` : ` L`) + ` ${x} ${y}`;
+    });
+    pathFill += ` L ${w} ${h} Z`;
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <path d="${pathFill}" fill="rgba(250,204,21,0.15)" stroke="none"/>
+        <path d="${pathLine}" stroke="#FACC15" stroke-width="2" fill="none"/>
+    </svg>`;
+}
+
+// ==========================================
+// GRÁFICO DE CATEGORIAS (doughnut)
+// ==========================================
+function desenharGraficoCategorias(catValor) {
+    const ctx = document.getElementById('grafico-categorias');
+    if (!ctx) return;
+    destruirGrafico('categorias');
+    const cores = ['#FACC15', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4'];
+    graficosAtivos['categorias'] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(catValor),
+            datasets: [{
+                data: Object.values(catValor),
+                backgroundColor: cores.slice(0, Object.keys(catValor).length),
+                borderColor: '#0A0A0A',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '60%',
+            plugins: {
+                legend: { position: 'right', labels: { color: '#8A8A8A', font: { size: 11 }, padding: 8, boxWidth: 10, boxHeight: 10 } },
+                tooltip: { callbacks: { label: (c) => `${c.label}: ${formatarMoeda(c.parsed)}` } }
+            }
+        }
     });
 }
