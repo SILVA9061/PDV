@@ -27,7 +27,6 @@
     --radius-pill: 100px;
     --shadow-card: 0 8px 24px rgba(0,0,0,0.5);
     --shadow-glow: 0 8px 32px rgba(250, 204, 21, 0.35);
-    --shadow-soft: 0 4px 12px rgba(0,0,0,0.3);
     --sidebar-w: 240px;
     --painel-w: 320px;
 }
@@ -69,10 +68,9 @@ input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 button { touch-action: manipulation; }
 
-/* Scrollbar geral (só quando aparece) */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
 /* ==========================================
@@ -100,7 +98,7 @@ button { touch-action: manipulation; }
 .pc-painel-direito { display: none; }
 
 /* ==========================================
-   HEADER MOBILE/TABLET
+   HEADER MOBILE
    ========================================== */
 .mobile-header {
     background: var(--bg-elevated);
@@ -164,7 +162,6 @@ button { touch-action: manipulation; }
     border-radius: 10px;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -200,7 +197,7 @@ button { touch-action: manipulation; }
 .gaveta-chip .valor { color: var(--accent); font-weight: 800; }
 
 /* ==========================================
-   TELAS
+   TELAS GENÉRICAS
    ========================================== */
 .tela {
     display: flex;
@@ -236,16 +233,6 @@ h2 {
     color: var(--text-secondary);
     text-align: center;
     margin-top: -0.4rem;
-}
-.tela-rodape-info {
-    position: absolute;
-    bottom: 1.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
 }
 
 /* ==========================================
@@ -354,7 +341,6 @@ button:active { transform: scale(0.97); }
     padding: 0.4rem 0.6rem;
     align-self: flex-start;
     font-weight: 600;
-    gap: 0.3rem;
 }
 .btn-voltar:hover { color: var(--accent); }
 .btn-mini {
@@ -503,7 +489,7 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ==========================================
-   FILTROS DE PERÍODO
+   FILTROS
    ========================================== */
 .filtros-periodo {
     display: grid;
@@ -522,7 +508,6 @@ canvas { display: block; max-width: 100%; }
     border-radius: 100px;
     font-size: 0.78rem;
     font-weight: 700;
-    transition: all 0.15s;
 }
 .filtro-btn.ativo {
     background: var(--accent);
@@ -558,7 +543,7 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ==========================================
-   MENU PRINCIPAL (MOBILE/TABLET)
+   MENU MOBILE
    ========================================== */
 .tela-menu {
     display: flex;
@@ -612,7 +597,6 @@ canvas { display: block; max-width: 100%; }
     background: var(--bg-card);
     border: 1px solid var(--border);
     color: var(--text-secondary);
-    transition: all 0.15s;
 }
 .grid-botoes-3 button:hover {
     border-color: var(--border-strong);
@@ -683,7 +667,6 @@ canvas { display: block; max-width: 100%; }
     padding: 0.3rem 0.5rem;
     cursor: pointer;
     font-weight: 700;
-    gap: 0.3rem;
 }
 .btn-voltar-inline:hover { color: var(--accent); }
 .btn-seletor {
@@ -701,7 +684,6 @@ canvas { display: block; max-width: 100%; }
     justify-content: space-between;
     gap: 0.5rem;
     text-align: left;
-    transition: all 0.15s;
 }
 .btn-seletor:focus, .btn-seletor:active { border-color: var(--accent); }
 .btn-seletor.vazio .seletor-label { color: var(--text-dim); }
@@ -720,11 +702,9 @@ canvas { display: block; max-width: 100%; }
     font-size: 0.72rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.15s;
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    letter-spacing: 0.3px;
 }
 .chip-categoria.ativo {
     background: var(--accent);
@@ -753,7 +733,6 @@ canvas { display: block; max-width: 100%; }
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: all 0.15s;
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
@@ -830,7 +809,6 @@ canvas { display: block; max-width: 100%; }
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    -webkit-overflow-scrolling: touch;
 }
 .carrinho-vazio {
     text-align: center;
@@ -937,7 +915,7 @@ canvas { display: block; max-width: 100%; }
 .venda-comissao-linha .valor-comissao { color: var(--accent); font-weight: 800; }
 .venda-rodape .btn-pill { padding: 0.95rem; font-size: 1rem; }
 
-/* Botões de opção (pagamento/status) */
+/* Opções */
 .opcoes-grid { display: grid; gap: 0.45rem; }
 .opcoes-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 .opcoes-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
@@ -955,7 +933,6 @@ canvas { display: block; max-width: 100%; }
     align-items: center;
     justify-content: center;
     gap: 0.25rem;
-    transition: all 0.15s;
     text-align: center;
     line-height: 1.15;
     text-transform: uppercase;
@@ -969,7 +946,7 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ==========================================
-   TAGS E CATEGORIA TÍTULO
+   TAGS
    ========================================== */
 .tag-cat {
     display: inline-block;
@@ -981,7 +958,6 @@ canvas { display: block; max-width: 100%; }
     font-weight: 700;
     margin-left: 0.3rem;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
 }
 .tag-modelo {
     display: inline-block;
@@ -1098,7 +1074,6 @@ canvas { display: block; max-width: 100%; }
     border: 1px solid var(--border);
     border-radius: var(--radius-input);
     cursor: pointer;
-    transition: all 0.15s;
     border-left: 4px solid var(--accent);
 }
 .item-catalogo:hover, .item-catalogo:active {
@@ -1215,7 +1190,6 @@ canvas { display: block; max-width: 100%; }
     font-weight: 600;
     border-radius: var(--radius-input);
     cursor: pointer;
-    transition: all 0.15s;
     text-align: left;
     display: flex;
     align-items: center;
@@ -1230,7 +1204,7 @@ canvas { display: block; max-width: 100%; }
     border-color: var(--accent);
     box-shadow: 0 4px 12px var(--accent-glow);
 }
-.seletor-opcao.ativo::after { content: '✓'; font-weight: 800; font-size: 0.9rem; }
+.seletor-opcao.ativo::after { content: '✓'; font-weight: 800; }
 .btn-download-plataforma {
     display: flex;
     align-items: center;
@@ -1241,7 +1215,6 @@ canvas { display: block; max-width: 100%; }
     border-radius: var(--radius-input);
     text-decoration: none;
     color: white;
-    transition: all 0.15s;
 }
 .btn-download-plataforma:hover { border-color: var(--accent); background: #1e1e1e; }
 .plat-icone { font-size: 1.5rem; }
@@ -1249,7 +1222,7 @@ canvas { display: block; max-width: 100%; }
 .plat-desc { font-size: 0.72rem; color: var(--text-secondary); }
 
 /* ==========================================
-   KBD HINTS
+   KBD HINT
    ========================================== */
 .kbd-hint {
     display: none;
@@ -1268,14 +1241,14 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ==========================================
-   FILTROS DO DASHBOARD
+   FILTROS DO DASHBOARD (mobile/tablet)
    ========================================== */
 .dashboard-filtros-wrapper {
     display: flex;
-    gap: 0.6rem;
+    gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
-    margin-bottom: 1.2rem;
+    margin-bottom: 0.9rem;
 }
 .dashboard-filtros {
     display: flex;
@@ -1295,7 +1268,6 @@ canvas { display: block; max-width: 100%; }
     font-weight: 700;
     border-radius: 100px;
     cursor: pointer;
-    transition: all 0.15s;
     white-space: nowrap;
     text-transform: uppercase;
 }
@@ -1317,7 +1289,6 @@ canvas { display: block; max-width: 100%; }
     font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.15s;
     text-transform: uppercase;
 }
 .btn-filtro-extra:hover { border-color: var(--accent); color: var(--accent); }
@@ -1327,7 +1298,7 @@ canvas { display: block; max-width: 100%; }
     border-color: var(--accent);
 }
 
-/* Variação (badge de %) */
+/* Badge variação */
 .kpi-variacao {
     display: inline-flex;
     align-items: center;
@@ -1344,7 +1315,6 @@ canvas { display: block; max-width: 100%; }
 .kpi-variacao.neutra { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
 .kpi-variacao .seta { font-size: 0.65rem; }
 
-/* Sparkline */
 .kpi-sparkline {
     position: absolute;
     bottom: 0;
@@ -1356,7 +1326,6 @@ canvas { display: block; max-width: 100%; }
 }
 .kpi-sparkline svg { width: 100%; height: 100%; }
 
-/* Legenda do gráfico */
 .grafico-legenda {
     display: flex;
     gap: 1.2rem;
@@ -1380,10 +1349,7 @@ canvas { display: block; max-width: 100%; }
         max-width: 720px;
         padding: 1.5rem;
     }
-    .grid-botoes-3 {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.75rem;
-    }
+    .grid-botoes-3 { gap: 0.75rem; }
     .grid-botoes-3 button {
         min-height: 96px;
         font-size: 0.78rem;
@@ -1408,12 +1374,10 @@ canvas { display: block; max-width: 100%; }
         scrollbar-width: none;
     }
     .dashboard-filtros::-webkit-scrollbar { display: none; }
-    .modo-comparacao { grid-template-columns: 1fr; }
-    .pc-analise-row { grid-template-columns: 1fr; }
 }
 
 /* ==========================================
-   PC — DASHBOARD SEM SCROLL (>=1100px)
+   PC (>= 1100px)
    ========================================== */
 @media (min-width: 1100px) {
 
@@ -1485,25 +1449,16 @@ canvas { display: block; max-width: 100%; }
         flex-shrink: 0;
         border: 1px solid var(--border);
     }
-    .sidebar-operador-info {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        flex: 1;
-    }
+    .sidebar-operador-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
     .sidebar-operador-nome {
         font-size: 0.85rem;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .sidebar-operador-label {
-        font-size: 0.68rem;
-        color: var(--text-secondary);
-    }
+    .sidebar-operador-label { font-size: 0.68rem; color: var(--text-secondary); }
     .sidebar-gaveta {
         display: none;
         align-items: center;
@@ -1549,7 +1504,6 @@ canvas { display: block; max-width: 100%; }
         font-weight: 600;
         font-size: 0.88rem;
         text-align: left;
-        transition: all 0.15s;
         position: relative;
     }
     .sidebar-menu-item:hover {
@@ -1578,12 +1532,7 @@ canvas { display: block; max-width: 100%; }
         justify-content: center;
         flex-shrink: 0;
     }
-    .sidebar-menu-label {
-        flex: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+    .sidebar-menu-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sidebar-rodape {
         display: flex;
         flex-direction: column;
@@ -1612,16 +1561,9 @@ canvas { display: block; max-width: 100%; }
         font-weight: 700;
         font-size: 0.82rem;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
     }
-    .sidebar-btn-fechar:not(:disabled):hover {
-        border-color: var(--danger);
-        color: var(--danger);
-    }
-    .sidebar-btn-fechar:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-    }
+    .sidebar-btn-fechar:not(:disabled):hover { border-color: var(--danger); color: var(--danger); }
+    .sidebar-btn-fechar:disabled { opacity: 0.35; cursor: not-allowed; }
 
     /* ---- PAINEL DIREITO ---- */
     .pc-painel-direito {
@@ -1677,36 +1619,13 @@ canvas { display: block; max-width: 100%; }
         border-left: 3px solid var(--success);
     }
     .pc-atividade-icone { font-size: 0.9rem; }
-    .pc-atividade-info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-        min-width: 0;
-    }
-    .pc-atividade-produto {
-        font-size: 0.78rem;
-        font-weight: 700;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+    .pc-atividade-info { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+    .pc-atividade-produto { font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pc-atividade-hora { font-size: 0.62rem; color: var(--text-secondary); }
-    .pc-atividade-valor {
-        font-size: 0.8rem;
-        font-weight: 800;
-        color: var(--accent);
-        white-space: nowrap;
-    }
-    .pc-vazio {
-        text-align: center;
-        color: var(--text-dim);
-        font-size: 0.8rem;
-        padding: 1.5rem 1rem;
-        font-style: italic;
-    }
+    .pc-atividade-valor { font-size: 0.8rem; font-weight: 800; color: var(--accent); white-space: nowrap; }
+    .pc-vazio { text-align: center; color: var(--text-dim); font-size: 0.8rem; padding: 1.5rem 1rem; font-style: italic; }
 
-    /* ---- CARRINHO NO PC ---- */
+    /* ---- CARRINHO PC ---- */
     .pc-carrinho-lista {
         flex: 1;
         overflow-y: auto;
@@ -1724,30 +1643,9 @@ canvas { display: block; max-width: 100%; }
         border-radius: var(--radius-input);
         border-left: 3px solid var(--accent);
     }
-    .pc-carrinho-nome {
-        flex: 1;
-        font-size: 0.85rem;
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .pc-carrinho-valor {
-        font-size: 0.85rem;
-        font-weight: 800;
-        color: var(--accent);
-        white-space: nowrap;
-    }
-    .pc-carrinho-remover {
-        background: transparent;
-        border: none;
-        color: var(--danger);
-        cursor: pointer;
-        font-size: 0.85rem;
-        padding: 0.2rem 0.4rem;
-        border-radius: 5px;
-        font-weight: 800;
-    }
+    .pc-carrinho-nome { flex: 1; font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pc-carrinho-valor { font-size: 0.85rem; font-weight: 800; color: var(--accent); white-space: nowrap; }
+    .pc-carrinho-remover { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.4rem; border-radius: 5px; font-weight: 800; }
     .pc-carrinho-remover:hover { background: var(--danger); color: white; }
     .pc-carrinho-rodape {
         padding: 0.9rem 1.2rem 1.2rem;
@@ -1759,25 +1657,9 @@ canvas { display: block; max-width: 100%; }
         flex-shrink: 0;
         box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
     }
-    .pc-total-linha {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-    }
-    .pc-total-label {
-        font-size: 0.72rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        font-weight: 800;
-    }
-    .pc-total-valor {
-        font-size: 1.85rem;
-        color: var(--accent);
-        font-weight: 800;
-        letter-spacing: -1px;
-        line-height: 1;
-    }
+    .pc-total-linha { display: flex; justify-content: space-between; align-items: baseline; }
+    .pc-total-label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800; }
+    .pc-total-valor { font-size: 1.85rem; color: var(--accent); font-weight: 800; letter-spacing: -1px; line-height: 1; }
     .pc-comissao-linha {
         display: flex;
         justify-content: space-between;
@@ -1788,11 +1670,7 @@ canvas { display: block; max-width: 100%; }
         border-bottom: 1px dashed var(--border-strong);
     }
     .pc-comissao-valor { color: var(--accent); font-weight: 800; }
-    .pc-pagamentos {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.4rem;
-    }
+    .pc-pagamentos { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
     .pc-pagamento-btn {
         display: flex;
         align-items: center;
@@ -1806,15 +1684,11 @@ canvas { display: block; max-width: 100%; }
         font-size: 0.72rem;
         font-weight: 700;
         cursor: pointer;
-        transition: all 0.15s;
         text-transform: uppercase;
         white-space: nowrap;
         overflow: hidden;
     }
-    .pc-pagamento-btn:hover {
-        border-color: var(--border-strong);
-        color: var(--text-primary);
-    }
+    .pc-pagamento-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
     .pc-pagamento-btn.ativo {
         background: var(--accent);
         color: #0A0A0A;
@@ -1935,11 +1809,7 @@ canvas { display: block; max-width: 100%; }
     }
     .pc-card-header { flex-shrink: 0; }
     .grafico-legenda { font-size: 0.62rem !important; padding: 0 !important; flex-shrink: 0; }
-    .pc-canvas-grande {
-        flex: 1;
-        min-height: 0;
-        position: relative;
-    }
+    .pc-canvas-grande { flex: 1; min-height: 0; position: relative; }
     .pc-lista-top {
         flex: 1;
         min-height: 0;
@@ -2029,13 +1899,7 @@ canvas { display: block; max-width: 100%; }
         border: 1px solid var(--border);
         flex-shrink: 0;
     }
-    .pc-vendedor-info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 0.05rem;
-        min-width: 0;
-    }
+    .pc-vendedor-info { flex: 1; display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
     .pc-vendedor-nome {
         font-size: 0.78rem;
         font-weight: 800;
@@ -2045,12 +1909,7 @@ canvas { display: block; max-width: 100%; }
         text-overflow: ellipsis;
     }
     .pc-vendedor-detalhe { font-size: 0.65rem; color: var(--text-secondary); }
-    .pc-vendedor-valor {
-        font-size: 0.82rem;
-        font-weight: 800;
-        color: var(--accent);
-        white-space: nowrap;
-    }
+    .pc-vendedor-valor { font-size: 0.82rem; font-weight: 800; color: var(--accent); white-space: nowrap; }
     .pc-vendedor-barra {
         height: 3px;
         background: var(--bg-deep);
@@ -2062,7 +1921,6 @@ canvas { display: block; max-width: 100%; }
         height: 100%;
         background: linear-gradient(90deg, #FACC15, #F59E0B);
         border-radius: 2px;
-        transition: width 0.5s;
     }
 
     .btn-nova-venda-pc {
@@ -2074,7 +1932,7 @@ canvas { display: block; max-width: 100%; }
         flex-shrink: 0;
     }
 
-    /* ---- TELA DE VENDA NO PC ---- */
+    /* ---- VENDA PC ---- */
     .tela-venda {
         max-width: 100%;
         width: 100%;
@@ -2085,11 +1943,7 @@ canvas { display: block; max-width: 100%; }
         background: var(--bg-deep);
     }
     .venda-header h2 { font-size: 1.3rem; }
-    .venda-topo .btn-seletor {
-        padding: 0.9rem 1.1rem;
-        font-size: 0.95rem;
-        max-width: 420px;
-    }
+    .venda-topo .btn-seletor { padding: 0.9rem 1.1rem; font-size: 0.95rem; max-width: 420px; }
     .chip-categoria { padding: 0.55rem 0.9rem; font-size: 0.78rem; }
     .venda-carrinho { padding: 1rem 1.8rem; gap: 0.6rem; }
     .item-carrinho { max-width: 620px; padding: 0.85rem 1rem; }
@@ -2097,7 +1951,7 @@ canvas { display: block; max-width: 100%; }
     .item-carrinho .valor-input { width: 100px; font-size: 0.95rem; }
     .venda-rodape { display: none; }
 
-    /* ---- TELAS GENÉRICAS NO PC ---- */
+    /* ---- TELAS GENÉRICAS PC ---- */
     .tela { max-width: 1000px; padding: 1.8rem 2.5rem; }
     .tela h2 { font-size: 1.5rem; }
     .subtitulo { font-size: 0.9rem; }
@@ -2115,7 +1969,6 @@ canvas { display: block; max-width: 100%; }
     .categoria-titulo:first-child { margin-top: 0; }
     .form-container { max-width: 620px; margin: 0 auto; }
 
-    /* Catálogo no PC */
     .catalogo-lista {
         max-width: 1200px;
         padding: 1.5rem 2rem 3rem;
@@ -2123,10 +1976,7 @@ canvas { display: block; max-width: 100%; }
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
         gap: 0.75rem;
     }
-    .catalogo-tabs-wrapper {
-        padding: 0.7rem 2rem;
-        justify-content: center;
-    }
+    .catalogo-tabs-wrapper { padding: 0.7rem 2rem; justify-content: center; }
     .catalogo-busca-wrapper { padding: 0.8rem 2rem; }
     .catalogo-busca-wrapper .input-grande {
         max-width: 620px;
@@ -2134,7 +1984,6 @@ canvas { display: block; max-width: 100%; }
         display: block;
     }
 
-    /* Modais no PC */
     .modal-box { max-width: 480px; padding: 1.6rem; }
     .seletor-opcoes { max-height: 60vh; }
     .card-grafico-canvas { height: 200px; }
@@ -2142,7 +1991,7 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ==========================================
-   AJUSTES PARA MONITORES BAIXOS (1366x768)
+   MONITORES BAIXOS (1366x768)
    ========================================== */
 @media (min-width: 1100px) and (max-height: 850px) {
     .pc-dashboard {
@@ -2171,7 +2020,7 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ==========================================
-   AJUSTES EXTRAS
+   AJUSTES FINAIS
    ========================================== */
 @media (max-width: 380px) {
     html { font-size: 14px; }

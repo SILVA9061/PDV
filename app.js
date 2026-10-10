@@ -32,7 +32,7 @@ const SUPABASE_URL = 'https://pqmsgpccifptjmduflca.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbXNncGNjaWZwdGptZHVmbGNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTMxNjUsImV4cCI6MjEwNzIyOTE2NX0.5PyX7New60N0EsWzWzdni3b5l0L_aaWClJRe6DRLYK0';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const URL_DOWNLOAD_WINDOWS = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BRTEST_PDV.exe';
+const URL_DOWNLOAD_WINDOWS = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BR.Test.PDV_0.0.1_x64-setup.exe?download';
 const URL_DOWNLOAD_ANDROID = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BR-Test-PDV.apk?download';
 const URL_DOWNLOAD_IOS     = 'https://pqmsgpccifptjmduflca.supabase.co/storage/v1/object/public/DOWNLOADS/BR-Test-PDV.ipa?download';
 
@@ -81,6 +81,8 @@ let parcelasSelecionadas = 1;
 let vendedoresCache = [];
 let menuAtivoId = 'dashboard';
 let graficosAtivos = {};
+let periodoDashboardSelecionado = 'hoje';
+let mesEspecificoAtivo = null;
 
 // ==========================================
 // 3. UTILITÁRIOS
@@ -103,25 +105,23 @@ function iniciarRelogio() {
         const hh = String(agora.getHours()).padStart(2, '0');
         const mm = String(agora.getMinutes()).padStart(2, '0');
         const ss = String(agora.getSeconds()).padStart(2, '0');
-        const texto = `${hh}:${mm}:${ss}`;
         const relEl = document.getElementById('relogio');
         if (relEl) relEl.textContent = `${hh}:${mm}`;
         const sbRel = document.getElementById('sidebar-relogio');
-        if (sbRel) sbRel.textContent = texto;
+        if (sbRel) sbRel.textContent = `${hh}:${mm}:${ss}`;
     };
     tick();
     relogioInterval = setInterval(tick, 1000);
 }
 
 // ==========================================
-// 4. SIDEBAR PC + HEADER
+// 4. SIDEBAR E HEADER
 // ==========================================
 function renderizarSidebar() {
     const menuEl = document.getElementById('sidebar-menu');
     if (!menuEl) return;
     menuEl.innerHTML = MENU_ITENS.map(item => `
-        <button class="sidebar-menu-item ${menuAtivoId === item.id ? 'ativo' : ''}" 
-                onclick="${item.acao}()">
+        <button class="sidebar-menu-item ${menuAtivoId === item.id ? 'ativo' : ''}" onclick="${item.acao}()">
             <span class="sidebar-menu-icone">${item.icone}</span>
             <span class="sidebar-menu-label">${item.label}</span>
         </button>
@@ -132,9 +132,7 @@ function atualizarSidebar(caixa) {
     const tagEl = document.getElementById('sidebar-tag');
     const nomeEl = document.getElementById('sidebar-operador-nome');
     const gavetaEl = document.getElementById('sidebar-gaveta');
-    const gavetaValorEl = document.getElementById('sidebar-gaveta-valor');
     const btnFechar = document.getElementById('sidebar-btn-fechar');
-
     if (caixa) {
         if (tagEl) { tagEl.textContent = 'ABERTO'; tagEl.classList.remove('fechado'); }
         if (nomeEl) nomeEl.textContent = caixa.operador;
@@ -153,7 +151,6 @@ function atualizarHeaderMobile(caixa) {
     const opEl = document.getElementById('header-operador');
     const gavetaEl = document.getElementById('header-gaveta');
     const header = document.getElementById('main-header');
-
     if (caixa) {
         if (header) header.classList.add('ativo');
         if (tagEl) { tagEl.textContent = 'ABERTO'; tagEl.classList.remove('fechado'); }
@@ -172,7 +169,6 @@ async function atualizarValorGaveta() {
     const { data: movimentos } = await supabaseClient.from('movimentos')
         .select('tipo, valor, forma_pagamento')
         .eq('caixa_id', caixaAtual.id).eq('cancelado', false);
-
     let dinheiroVendas = 0, suprimentos = 0, sangrias = 0;
     (movimentos || []).forEach(m => {
         const v = parseFloat(m.valor);
@@ -180,10 +176,8 @@ async function atualizarValorGaveta() {
         else if (m.tipo === 'suprimento') suprimentos += v;
         else if (m.tipo === 'sangria') sangrias += v;
     });
-
     const naGaveta = parseFloat(caixaAtual.valor_inicial) + dinheiroVendas + suprimentos - sangrias;
     const txt = formatarMoeda(naGaveta);
-
     const sbVal = document.getElementById('sidebar-gaveta-valor');
     if (sbVal) sbVal.textContent = txt;
     const hdVal = document.getElementById('header-gaveta-valor');
@@ -191,7 +185,7 @@ async function atualizarValorGaveta() {
 }
 
 // ==========================================
-// 5. MODAIS BASE
+// 5. MODAIS
 // ==========================================
 function abrirModal(titulo, mensagem, callbackConfirmar = null) {
     document.getElementById('modal-titulo').textContent = titulo;
@@ -231,7 +225,6 @@ function confirmarValorProduto() {
     fecharModalValor();
 }
 
-// SELETOR GENÉRICO
 function abrirSeletor(titulo, opcoes, valorAtual, callback) {
     seletorCallback = callback;
     document.getElementById('seletor-titulo').textContent = titulo;
@@ -243,14 +236,8 @@ function abrirSeletor(titulo, opcoes, valorAtual, callback) {
     document.getElementById('modal-seletor').classList.add('ativo');
     modalAbertoEm = Date.now();
 }
-function fecharSeletor() {
-    document.getElementById('modal-seletor').classList.remove('ativo');
-    seletorCallback = null;
-}
-function escolherSeletor(valor) {
-    if (seletorCallback) seletorCallback(valor);
-    fecharSeletor();
-}
+function fecharSeletor() { document.getElementById('modal-seletor').classList.remove('ativo'); seletorCallback = null; }
+function escolherSeletor(valor) { if (seletorCallback) seletorCallback(valor); fecharSeletor(); }
 
 function abrirModalDownloads() {
     document.getElementById('link-download-windows').href = URL_DOWNLOAD_WINDOWS;
@@ -286,12 +273,10 @@ function obterRangePeriodo(periodo, dataInicio = null, dataFim = null) {
 document.addEventListener('keydown', (e) => {
     const modalCatalogo = document.getElementById('modal-catalogo').classList.contains('ativo');
     if (modalCatalogo) { if (e.key === 'Escape') { e.preventDefault(); fecharCatalogo(); } return; }
-
     const modalAviso = document.getElementById('modal-overlay').classList.contains('ativo');
     const modalDown = document.getElementById('modal-downloads').classList.contains('ativo');
     const modalValor = document.getElementById('modal-valor').classList.contains('ativo');
     const modalSeletor = document.getElementById('modal-seletor').classList.contains('ativo');
-
     if (modalAviso || modalDown || modalValor || modalSeletor) {
         const tempo = Date.now() - modalAbertoEm;
         if (e.key === 'Escape') { e.preventDefault();
@@ -308,7 +293,6 @@ document.addEventListener('keydown', (e) => {
         }
         return;
     }
-
     const dropdown = document.getElementById('busca-resultados');
     if (dropdown && dropdown.classList.contains('ativo')) {
         const itens = dropdown.querySelectorAll('.busca-resultado-item');
@@ -321,7 +305,6 @@ document.addEventListener('keydown', (e) => {
         }
         if (e.key === 'Escape') { e.preventDefault(); dropdown.classList.remove('ativo'); return; }
     }
-
     if (e.key === 'Escape') { if (caixaAtual) { e.preventDefault(); renderizarMenuPrincipal(); } return; }
     if (caixaAtual) {
         const atalhos = {
@@ -393,7 +376,6 @@ function renderizarTelaAbrirCaixa() {
                 </div>
                 <button onclick="abrirCaixa()" class="btn-primario btn-pill">ABRIR CAIXA</button>
             </div>
-            <div class="tela-rodape-info">OURINHOS · SP</div>
         </div>`;
     setTimeout(() => document.getElementById('input-operador').focus(), 100);
 }
@@ -413,7 +395,7 @@ async function abrirCaixa() {
 }
 
 // ==========================================
-// 9. MENU PRINCIPAL / DASHBOARD
+// 9. MENU / DASHBOARD
 // ==========================================
 async function renderizarMenuPrincipal() {
     menuAtivoId = 'dashboard';
@@ -422,191 +404,16 @@ async function renderizarMenuPrincipal() {
     await carregarDashboard(periodoDashboardSelecionado);
 }
 
-// -------------- DASHBOARD MOBILE --------------
-function renderizarDashboardMobile({ totalVendas, qtdVendas, ticket, totalComissoes, diasLabels, diasValores, topProdutos, ultimasVendas }) {
-    document.getElementById('app-container').innerHTML = `
-        <div class="tela-menu">
-            <div class="card-resumo card-destaque">
-                <span>VENDAS DE HOJE</span>
-                <strong>${formatarMoeda(totalVendas)}</strong>
-                <div class="metricas-mini">
-                    <span>${qtdVendas} venda${qtdVendas !== 1 ? 's' : ''}</span>
-                    <span>•</span>
-                    <span>Ticket ${formatarMoeda(ticket)}</span>
-                </div>
-            </div>
-
-            <div class="card-grafico">
-                <div class="card-grafico-header">
-                    <span class="card-grafico-titulo">Últimos 7 dias</span>
-                </div>
-                <div class="card-grafico-canvas">
-                    <canvas id="grafico-semana"></canvas>
-                </div>
-            </div>
-
-            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda">NOVA VENDA 🛒</button>
-
-            <div class="grid-botoes-3">
-                <button onclick="renderizarTelaSangria()" class="btn-neutro"><span class="icone-btn">📤</span><span>Sangria</span></button>
-                <button onclick="renderizarTelaSuprimento()" class="btn-neutro"><span class="icone-btn">📥</span><span>Suprimento</span></button>
-                <button onclick="renderizarHistorico()" class="btn-neutro"><span class="icone-btn">📋</span><span>Histórico</span></button>
-                <button onclick="renderizarRelatorioComissoes()" class="btn-neutro"><span class="icone-btn">💰</span><span>Comissões</span></button>
-                <button onclick="renderizarTelaVendedores()" class="btn-neutro"><span class="icone-btn">👥</span><span>Vendedores</span></button>
-                <button onclick="renderizarTelaProdutos()" class="btn-neutro"><span class="icone-btn">📦</span><span>Produtos</span></button>
-            </div>
-
-            <button onclick="renderizarTelaFecharCaixa()" class="btn-fechar-caixa">🔒 Fechar Caixa</button>
-
-            <div class="dica-atalhos"><strong>F2</strong> a <strong>F9</strong> para atalhos • <strong>Esc</strong> volta</div>
-        </div>`;
-
-    // Gráfico de linha
-    setTimeout(() => {
-        const ctx = document.getElementById('grafico-semana');
-        if (!ctx) return;
-        destruirGrafico('semana');
-        graficosAtivos['semana'] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: diasLabels,
-                datasets: [{
-                    data: diasValores,
-                    borderColor: '#FACC15',
-                    backgroundColor: 'rgba(250, 204, 21, 0.08)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointBackgroundColor: '#FACC15',
-                    pointBorderColor: '#0A0A0A',
-                    pointBorderWidth: 2,
-                    pointRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => formatarMoeda(c.parsed.y) } } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8A8A8A', font: { size: 10 }, callback: (v) => 'R$' + v } },
-                    x: { grid: { display: false }, ticks: { color: '#8A8A8A', font: { size: 10 } } }
-                }
-            }
-        });
-    }, 50);
-}
-
-// -------------- DASHBOARD PC --------------
-let periodoDashboardSelecionado = 'hoje';
-let mesEspecificoAtivo = null;
-
-async function carregarDashboard(periodo) {
-    const agora = new Date();
-    let inicio, fim, inicioAnterior, fimAnterior, labelAtual, labelAnterior;
-
-    if (periodo === 'hoje') {
-        inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
-        fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59);
-        inicioAnterior = new Date(inicio.getTime() - 24 * 3600000);
-        fimAnterior = new Date(inicio.getTime() - 1);
-        labelAtual = 'hoje'; labelAnterior = 'ontem';
-    } else if (periodo === '7dias') {
-        fim = new Date();
-        inicio = new Date(agora.getTime() - 6 * 24 * 3600000);
-        inicio.setHours(0,0,0,0);
-        fimAnterior = new Date(inicio.getTime() - 1);
-        inicioAnterior = new Date(fimAnterior.getTime() - 6 * 24 * 3600000);
-        inicioAnterior.setHours(0,0,0,0);
-        labelAtual = 'últimos 7 dias'; labelAnterior = '7 dias anteriores';
-
-    } else if (periodo === 'mes') {
-        inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
-        fim = new Date();
-        fimAnterior = new Date(inicio.getTime() - 1);
-        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
-        labelAtual = 'este mês'; labelAnterior = 'mês passado';
-    } else if (periodo === 'mesPassado') {
-        inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0);
-        fim = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59);
-        fimAnterior = new Date(inicio.getTime() - 1);
-        inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
-        labelAtual = 'mês passado'; labelAnterior = 'mês retrasado';
-    }
-
-    const [atualResp, anteriorResp] = await Promise.all([
-        supabaseClient.from('movimentos').select('valor, comissao_valor, criado_em, produto')
-            .eq('tipo','venda').eq('cancelado', false)
-            .gte('criado_em', inicio.toISOString()).lte('criado_em', fim.toISOString()),
-        supabaseClient.from('movimentos').select('valor, comissao_valor, criado_em')
-            .eq('tipo','venda').eq('cancelado', false)
-            .gte('criado_em', inicioAnterior.toISOString()).lte('criado_em', fimAnterior.toISOString())
-    ]);
-
-    const movAtual = atualResp.data || [];
-    const movAnterior = anteriorResp.data || [];
-
-    const totalVendas = movAtual.reduce((a,m) => a + parseFloat(m.valor), 0);
-    const qtdVendas = movAtual.length;
-    const ticket = qtdVendas > 0 ? totalVendas / qtdVendas : 0;
-    const totalComissoes = movAtual.reduce((a,m) => a + parseFloat(m.comissao_valor || 0), 0);
-    const totalVendasAnt = movAnterior.reduce((a,m) => a + parseFloat(m.valor), 0);
-    const qtdVendasAnt = movAnterior.length;
-    const ticketAnt = qtdVendasAnt > 0 ? totalVendasAnt / qtdVendasAnt : 0;
-    const totalComissoesAnt = movAnterior.reduce((a,m) => a + parseFloat(m.comissao_valor || 0), 0);
-
-    const calcVar = (a, b) => b === 0 ? (a > 0 ? 100 : null) : ((a - b) / b) * 100;
-    const varVendas = calcVar(totalVendas, totalVendasAnt);
-    const varQtd = calcVar(qtdVendas, qtdVendasAnt);
-    const varTicket = calcVar(ticket, ticketAnt);
-    const varComissao = calcVar(totalComissoes, totalComissoesAnt);
-
-    const labels = [], valoresAtual = [], valoresAnterior = [];
-    if (periodo === 'hoje') {
-        for (let h = 0; h < 24; h++) {
-            labels.push(String(h).padStart(2,'0') + 'h');
-            valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).getHours() === h).reduce((a,m) => a + parseFloat(m.valor), 0));
-            valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).getHours() === h).reduce((a,m) => a + parseFloat(m.valor), 0));
-        }
-    } else {
-        const dias = periodo === '7dias' ? 7 : periodo === '30dias' ? 30 : 
-                     periodo === 'mes' ? agora.getDate() : new Date(agora.getFullYear(), agora.getMonth(), 0).getDate();
-        for (let i = 0; i < dias; i++) {
-            let dataDia;
-            if (periodo === '7dias' || periodo === '30dias') dataDia = new Date(inicio.getTime() + i * 24 * 3600000);
-            else if (periodo === 'mes') dataDia = new Date(agora.getFullYear(), agora.getMonth(), i + 1);
-            else { const m = new Date(agora.getFullYear(), agora.getMonth() - 1, 1); dataDia = new Date(m.getFullYear(), m.getMonth(), i + 1); }
-            
-            const key = dataDia.toISOString().slice(0,10);
-            labels.push(periodo === '7dias' ? ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dataDia.getDay()] : String(dataDia.getDate()).padStart(2,'0'));
-            valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === key).reduce((a,m) => a + parseFloat(m.valor), 0));
-            
-            let dataAnt;
-            if (periodo === '7dias' || periodo === '30dias') dataAnt = new Date(inicioAnterior.getTime() + i * 24 * 3600000);
-            else dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
-            const keyAnt = dataAnt.toISOString().slice(0,10);
-            valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === keyAnt).reduce((a,m) => a + parseFloat(m.valor), 0));
-        }
-    }
-
-    const prodQtd = {};
-    movAtual.forEach(m => { const p = m.produto || 'Produto'; prodQtd[p] = (prodQtd[p] || 0) + 1; });
-    const topProdutos = Object.entries(prodQtd).sort((a,b) => b[1] - a[1]).slice(0,5).map(([nome, qtd]) => ({ nome, qtd }));
-
-    const dados = {
-        totalVendas, qtdVendas, ticket, totalComissoes,
-        varVendas, varQtd, varTicket, varComissao,
-        labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior, topProdutos
-    };
-
-    if (DISPOSITIVO === 'pc') renderizarDashboardPC(dados);
-    else renderizarDashboardMobile(dados);
+async function alterarPeriodoDashboard(periodo) {
+    mesEspecificoAtivo = null;
+    periodoDashboardSelecionado = periodo;
+    await carregarDashboard(periodo);
 }
 
 async function carregarDashboard(periodo) {
     const agora = new Date();
     let inicio, fim, inicioAnterior, fimAnterior, labelAtual, labelAnterior;
 
-    // Mês específico escolhido pelo usuário
     if (mesEspecificoAtivo) {
         inicio = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes, 1, 0, 0, 0);
         fim = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes + 1, 0, 23, 59, 59);
@@ -629,14 +436,6 @@ async function carregarDashboard(periodo) {
         inicioAnterior = new Date(fimAnterior.getTime() - 6 * 24 * 3600000);
         inicioAnterior.setHours(0,0,0,0);
         labelAtual = 'últimos 7 dias'; labelAnterior = '7 dias anteriores';
-    } else if (periodo === '30dias') {
-        fim = new Date();
-        inicio = new Date(agora.getTime() - 29 * 24 * 3600000);
-        inicio.setHours(0,0,0,0);
-        fimAnterior = new Date(inicio.getTime() - 1);
-        inicioAnterior = new Date(fimAnterior.getTime() - 29 * 24 * 3600000);
-        inicioAnterior.setHours(0,0,0,0);
-        labelAtual = 'últimos 30 dias'; labelAnterior = '30 dias anteriores';
     } else if (periodo === 'mes') {
         inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
         fim = new Date();
@@ -649,6 +448,13 @@ async function carregarDashboard(periodo) {
         fimAnterior = new Date(inicio.getTime() - 1);
         inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
         labelAtual = 'mês passado'; labelAnterior = 'mês retrasado';
+    } else {
+        // Fallback
+        inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
+        fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59);
+        inicioAnterior = new Date(inicio.getTime() - 24 * 3600000);
+        fimAnterior = new Date(inicio.getTime() - 1);
+        labelAtual = 'hoje'; labelAnterior = 'ontem';
     }
 
     const [atualResp, anteriorResp] = await Promise.all([
@@ -678,7 +484,7 @@ async function carregarDashboard(periodo) {
     const varTicket = calcVar(ticket, ticketAnt);
     const varComissao = calcVar(totalComissoes, totalComissoesAnt);
 
-    // Labels e valores do gráfico
+    // Gráfico
     const labels = [], valoresAtual = [], valoresAnterior = [];
     if (periodo === 'hoje' && !mesEspecificoAtivo) {
         for (let h = 0; h < 24; h++) {
@@ -688,9 +494,8 @@ async function carregarDashboard(periodo) {
         }
     } else {
         let dias;
-        if (mesEspecificoAtivo) {
-            dias = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes + 1, 0).getDate();
-                } else if (periodo === '7dias') dias = 7;
+        if (mesEspecificoAtivo) dias = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes + 1, 0).getDate();
+        else if (periodo === '7dias') dias = 7;
         else if (periodo === 'mes') dias = agora.getDate();
         else dias = new Date(agora.getFullYear(), agora.getMonth(), 0).getDate();
 
@@ -699,7 +504,7 @@ async function carregarDashboard(periodo) {
             if (mesEspecificoAtivo) {
                 dataDia = new Date(mesEspecificoAtivo.ano, mesEspecificoAtivo.mes, i + 1);
                 dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
-                        } else if (periodo === '7dias') {
+            } else if (periodo === '7dias') {
                 dataDia = new Date(inicio.getTime() + i * 24 * 3600000);
                 dataAnt = new Date(inicioAnterior.getTime() + i * 24 * 3600000);
             } else if (periodo === 'mes') {
@@ -710,24 +515,18 @@ async function carregarDashboard(periodo) {
                 dataDia = new Date(m.getFullYear(), m.getMonth(), i + 1);
                 dataAnt = new Date(inicioAnterior.getFullYear(), inicioAnterior.getMonth(), i + 1);
             }
-            
             const key = dataDia.toISOString().slice(0,10);
             labels.push(periodo === '7dias' ? ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dataDia.getDay()] : String(dataDia.getDate()).padStart(2,'0'));
             valoresAtual.push(movAtual.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === key).reduce((a,m) => a + parseFloat(m.valor), 0));
-            
             const keyAnt = dataAnt.toISOString().slice(0,10);
             valoresAnterior.push(movAnterior.filter(m => new Date(m.criado_em).toISOString().slice(0,10) === keyAnt).reduce((a,m) => a + parseFloat(m.valor), 0));
         }
     }
 
     // Top produtos
-    const prodQtd = {}, prodValor = {};
-    movAtual.forEach(m => {
-        const p = m.produto || 'Produto';
-        prodQtd[p] = (prodQtd[p] || 0) + 1;
-        prodValor[p] = (prodValor[p] || 0) + parseFloat(m.valor);
-    });
-    const topProdutos = Object.entries(prodQtd).sort((a,b) => b[1] - a[1]).slice(0,5).map(([nome, qtd]) => ({ nome, qtd, valor: prodValor[nome] }));
+    const prodQtd = {};
+    movAtual.forEach(m => { const p = m.produto || 'Produto'; prodQtd[p] = (prodQtd[p] || 0) + 1; });
+    const topProdutos = Object.entries(prodQtd).sort((a,b) => b[1] - a[1]).slice(0,4).map(([nome, qtd]) => ({ nome, qtd }));
 
     // Top vendedores
     const vendQtd = {}, vendValor = {};
@@ -736,17 +535,13 @@ async function carregarDashboard(periodo) {
         vendQtd[v] = (vendQtd[v] || 0) + 1;
         vendValor[v] = (vendValor[v] || 0) + parseFloat(m.valor);
     });
-    const topVendedores = Object.entries(vendValor).sort((a,b) => b[1] - a[1]).slice(0,5).map(([nome, valor]) => ({ nome, valor, qtd: vendQtd[nome] }));
+    const topVendedores = Object.entries(vendValor).sort((a,b) => b[1] - a[1]).slice(0,4).map(([nome, valor]) => ({ nome, valor, qtd: vendQtd[nome] }));
     const maxVendedor = topVendedores[0]?.valor || 1;
 
     // Categorias
     const catValor = {};
-    movAtual.forEach(m => {
-        const c = m.categoria || 'Outros';
-        catValor[c] = (catValor[c] || 0) + parseFloat(m.valor);
-    });
+    movAtual.forEach(m => { const c = m.categoria || 'Outros'; catValor[c] = (catValor[c] || 0) + parseFloat(m.valor); });
 
-    // Sparkline (últimos 7 pontos)
     const sparkline = valoresAtual.slice(-7);
 
     const dados = {
@@ -756,20 +551,14 @@ async function carregarDashboard(periodo) {
         topProdutos, topVendedores, maxVendedor, catValor, sparkline
     };
 
-    if (DISPOSITIVO === 'pc') renderizarDashboardPC(dados);
+    if (DISPOSITIVO === 'pc') await renderizarDashboardPC(dados);
     else renderizarDashboardMobile(dados);
 }
 
-function badgeVariacao(valor, labelAnterior) {
-    if (valor === null) return `<span class="kpi-variacao neutra">— sem base</span>`;
-    const positivo = valor >= 0;
-    return `<span class="kpi-variacao ${positivo ? 'positiva' : 'negativa'}">
-        <span class="seta">${positivo ? '▲' : '▼'}</span> ${positivo ? '+' : ''}${valor.toFixed(1)}% 
-        <span style="opacity:0.7; font-weight:500;">vs ${labelAnterior}</span>
-    </span>`;
-}
-
-function renderizarDashboardPC(dados) {
+// ==========================================
+// 10. DASHBOARD PC
+// ==========================================
+async function renderizarDashboardPC(dados) {
     const { totalVendas, qtdVendas, ticket, totalComissoes, varVendas, varQtd, varTicket, varComissao, labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior, topProdutos, topVendedores, maxVendedor, catValor, sparkline } = dados;
 
     const periodos = [
@@ -785,7 +574,7 @@ function renderizarDashboardPC(dados) {
     const categoriasHTML = Object.keys(catValor).length > 0 
         ? `<div class="pc-analise-card">
             <div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div>
-            <div style="position:relative; height:200px;"><canvas id="grafico-categorias"></canvas></div>
+            <div style="position:relative; flex:1; min-height:0;"><canvas id="grafico-categorias"></canvas></div>
         </div>`
         : `<div class="pc-analise-card"><div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div><p class="pc-vazio">Sem dados no período</p></div>`;
 
@@ -832,9 +621,7 @@ function renderizarDashboardPC(dados) {
 
             <div class="pc-linha-graficos">
                 <div class="pc-card-grafico-grande">
-                    <div class="pc-card-header">
-                        <span class="pc-card-titulo">VENDAS · ${labelAtual.toUpperCase()}</span>
-                    </div>
+                    <div class="pc-card-header"><span class="pc-card-titulo">VENDAS · ${labelAtual.toUpperCase()}</span></div>
                     <div class="grafico-legenda">
                         <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
                         <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
@@ -862,8 +649,8 @@ function renderizarDashboardPC(dados) {
                         ${topVendedores.length > 0 ? topVendedores.map(v => {
                             const pct = (v.valor / maxVendedor) * 100;
                             return `
-                            <div class="pc-vendedor-item" style="flex-direction:column; align-items:stretch;">
-                                <div style="display:flex; align-items:center; gap:0.75rem;">
+                            <div class="pc-vendedor-item">
+                                <div style="display:flex; align-items:center; gap:0.6rem;">
                                     <div class="pc-vendedor-avatar">${v.nome.charAt(0).toUpperCase()}</div>
                                     <div class="pc-vendedor-info">
                                         <div class="pc-vendedor-nome">${v.nome}</div>
@@ -882,29 +669,65 @@ function renderizarDashboardPC(dados) {
             <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda-pc">🛒 NOVA VENDA</button>
         </div>`;
 
+    // Painel direito com atividade recente
+    const painelDir = document.getElementById('pc-painel-direito');
+    if (painelDir) {
+        const { data: ultimasVendas } = await supabaseClient.from('movimentos')
+            .select('produto, valor, criado_em, vendedor')
+            .eq('tipo', 'venda').eq('cancelado', false)
+            .order('criado_em', { ascending: false }).limit(8);
+        painelDir.innerHTML = `
+            <div class="pc-painel-header">
+                <span class="pc-painel-titulo">ATIVIDADE RECENTE</span>
+                <span class="pc-painel-contador">${(ultimasVendas || []).length}</span>
+            </div>
+            <div class="pc-painel-lista">
+                ${(ultimasVendas && ultimasVendas.length > 0) ? ultimasVendas.map(v => `
+                    <div class="pc-atividade-item">
+                        <span class="pc-atividade-icone">🛒</span>
+                        <div class="pc-atividade-info">
+                            <span class="pc-atividade-produto">${v.produto || 'Produto'}</span>
+                            <span class="pc-atividade-hora">${new Date(v.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})} · ${v.vendedor || 'Sem nome'}</span>
+                        </div>
+                        <span class="pc-atividade-valor">${formatarMoeda(v.valor)}</span>
+                    </div>
+                `).join('') : '<p class="pc-vazio">Sem vendas registradas</p>'}
+            </div>
+        `;
+        painelDir.classList.add('ativo');
+    }
+
     setTimeout(() => {
         desenharGraficoDashboard('grafico-pc-semana', labels, valoresAtual, valoresAnterior, labelAnterior);
         if (Object.keys(catValor).length > 0) desenharGraficoCategorias(catValor);
     }, 50);
 }
 
+// ==========================================
+// 11. DASHBOARD MOBILE
+// ==========================================
 function renderizarDashboardMobile(dados) {
     const { totalVendas, qtdVendas, ticket, varVendas, labelAnterior, labelAtual, labels, valoresAtual, valoresAnterior } = dados;
 
     const periodos = [
         { id: 'hoje', label: 'Hoje' },
         { id: '7dias', label: '7 dias' },
-        { id: '30dias', label: '30 dias' },
         { id: 'mes', label: 'Este mês' },
         { id: 'mesPassado', label: 'Mês passado' }
     ];
     const filtrosHtml = periodos.map(p => 
-        `<button class="filtro-periodo-btn ${p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
+        `<button class="filtro-periodo-btn ${!mesEspecificoAtivo && p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
     ).join('');
 
     document.getElementById('app-container').innerHTML = `
         <div class="tela-menu">
-            <div class="dashboard-filtros">${filtrosHtml}</div>
+            <div class="dashboard-filtros-wrapper">
+                <div class="dashboard-filtros">${filtrosHtml}</div>
+                <button class="btn-filtro-extra ${mesEspecificoAtivo ? 'ativo' : ''}" onclick="abrirSeletorMes()">
+                    📅 ${mesEspecificoAtivo ? mesEspecificoAtivo.label : 'Mês específico'}
+                </button>
+            </div>
+
             <div class="card-resumo card-destaque">
                 <span>VENDAS · ${labelAtual.toUpperCase()}</span>
                 <strong>${formatarMoeda(totalVendas)}</strong>
@@ -915,6 +738,7 @@ function renderizarDashboardMobile(dados) {
                     <span>Ticket ${formatarMoeda(ticket)}</span>
                 </div>
             </div>
+
             <div class="card-grafico">
                 <div class="card-grafico-header"><span class="card-grafico-titulo">Vendas · ${labelAtual}</span></div>
                 <div class="grafico-legenda">
@@ -923,7 +747,9 @@ function renderizarDashboardMobile(dados) {
                 </div>
                 <div class="card-grafico-canvas"><canvas id="grafico-semana"></canvas></div>
             </div>
+
             <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda">NOVA VENDA 🛒</button>
+
             <div class="grid-botoes-3">
                 <button onclick="renderizarTelaSangria()" class="btn-neutro"><span class="icone-btn">📤</span><span>Sangria</span></button>
                 <button onclick="renderizarTelaSuprimento()" class="btn-neutro"><span class="icone-btn">📥</span><span>Suprimento</span></button>
@@ -932,29 +758,56 @@ function renderizarDashboardMobile(dados) {
                 <button onclick="renderizarTelaVendedores()" class="btn-neutro"><span class="icone-btn">👥</span><span>Vendedores</span></button>
                 <button onclick="renderizarTelaProdutos()" class="btn-neutro"><span class="icone-btn">📦</span><span>Produtos</span></button>
             </div>
+
             <button onclick="renderizarTelaFecharCaixa()" class="btn-fechar-caixa">🔒 Fechar Caixa</button>
+
+            <div class="dica-atalhos"><strong>F2</strong> a <strong>F9</strong> para atalhos · <strong>Esc</strong> volta</div>
         </div>`;
     setTimeout(() => desenharGraficoDashboard('grafico-semana', labels, valoresAtual, valoresAnterior, labelAnterior), 50);
+}
+
+// ==========================================
+// 12. HELPERS DO DASHBOARD
+// ==========================================
+function badgeVariacao(valor, labelAnterior) {
+    if (valor === null) return `<span class="kpi-variacao neutra">— sem base</span>`;
+    const positivo = valor >= 0;
+    return `<span class="kpi-variacao ${positivo ? 'positiva' : 'negativa'}">
+        <span class="seta">${positivo ? '▲' : '▼'}</span> ${positivo ? '+' : ''}${valor.toFixed(1)}% 
+        <span style="opacity:0.7; font-weight:500;">vs ${labelAnterior}</span>
+    </span>`;
+}
+
+function gerarSparkline(valores) {
+    if (!valores || valores.length === 0) return '';
+    const max = Math.max(...valores, 1);
+    const w = 100, h = 40;
+    const stepX = w / Math.max(valores.length - 1, 1);
+    let pathFill = `M 0 ${h}`;
+    let pathLine = '';
+    valores.forEach((v, i) => {
+        const x = i * stepX;
+        const y = h - (v/max)*h;
+        pathFill += ` L ${x} ${y}`;
+        pathLine += (i === 0 ? `M` : ` L`) + ` ${x} ${y}`;
+    });
+    pathFill += ` L ${w} ${h} Z`;
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <path d="${pathFill}" fill="rgba(250,204,21,0.15)" stroke="none"/>
+        <path d="${pathLine}" stroke="#FACC15" stroke-width="2" fill="none"/>
+    </svg>`;
 }
 
 function desenharGraficoDashboard(canvasId, labels, valoresAtual, valoresAnterior, labelAnterior) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destruirGrafico(canvasId);
-
     const datasets = [{
-        label: 'Atual',
-        data: valoresAtual,
-        borderColor: '#FACC15',
-        backgroundColor: 'rgba(250, 204, 21, 0.10)',
-        borderWidth: 3,
-        tension: 0.4,
-        fill: true,
-        pointBackgroundColor: '#FACC15',
-        pointBorderColor: '#0A0A0A',
-        pointBorderWidth: 2,
-        pointRadius: 4,
-        order: 1
+        label: 'Atual', data: valoresAtual,
+        borderColor: '#FACC15', backgroundColor: 'rgba(250, 204, 21, 0.10)',
+        borderWidth: 3, tension: 0.4, fill: true,
+        pointBackgroundColor: '#FACC15', pointBorderColor: '#0A0A0A',
+        pointBorderWidth: 2, pointRadius: 4, order: 1
     }];
     if (valoresAnterior && valoresAnterior.some(v => v > 0)) {
         datasets.push({
@@ -964,7 +817,6 @@ function desenharGraficoDashboard(canvasId, labels, valoresAtual, valoresAnterio
             pointBackgroundColor: 'rgba(138, 138, 138, 0.6)', pointRadius: 3, order: 2
         });
     }
-
     graficosAtivos[canvasId] = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets },
@@ -980,19 +832,82 @@ function desenharGraficoDashboard(canvasId, labels, valoresAtual, valoresAnterio
                 }
             },
             scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8A8A8A', font: { size: 10, weight: '600' }, callback: (v) => v >= 1000 ? 'R$' + (v/1000).toFixed(1) + 'k' : 'R$' + v } },
-                x: { grid: { display: false }, ticks: { color: '#8A8A8A', font: { size: 10, weight: '600' }, maxRotation: 0, autoSkipPadding: 15 } }
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#8A8A8A', font: { size: 10, weight: '600' }, callback: (v) => v >= 1000 ? 'R$' + (v/1000).toFixed(1) + 'k' : 'R$' + v } },
+                x: { grid: { display: false },
+                    ticks: { color: '#8A8A8A', font: { size: 10, weight: '600' }, maxRotation: 0, autoSkipPadding: 15 } }
             }
         }
     });
 }
+
+function desenharGraficoCategorias(catValor) {
+    const ctx = document.getElementById('grafico-categorias');
+    if (!ctx) return;
+    destruirGrafico('categorias');
+    const cores = ['#FACC15', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4'];
+    graficosAtivos['categorias'] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(catValor),
+            datasets: [{
+                data: Object.values(catValor),
+                backgroundColor: cores.slice(0, Object.keys(catValor).length),
+                borderColor: '#0A0A0A', borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '60%',
+            plugins: {
+                legend: { position: 'right', labels: { color: '#8A8A8A', font: { size: 10 }, padding: 8, boxWidth: 10, boxHeight: 10 } },
+                tooltip: { callbacks: { label: (c) => `${c.label}: ${formatarMoeda(c.parsed)}` } }
+            }
+        }
+    });
+}
+
+async function abrirSeletorMes() {
+    const { data: movimentos } = await supabaseClient.from('movimentos')
+        .select('criado_em').eq('tipo', 'venda').eq('cancelado', false)
+        .order('criado_em', { ascending: false });
+    const agora = new Date();
+    const mesAtualKey = `${agora.getFullYear()}-${agora.getMonth()}`;
+    const mesesSet = new Set();
+    (movimentos || []).forEach(m => {
+        const d = new Date(m.criado_em);
+        mesesSet.add(`${d.getFullYear()}-${d.getMonth()}`);
+    });
+    if (mesesSet.size === 0) {
+        abrirModal('Aviso', 'Nenhuma venda registrada ainda. Faça sua primeira venda para usar o filtro por mês.');
+        return;
+    }
+    const opcoes = [
+        { valor: 'TODOS', label: '🔄 Ver período normal' },
+        ...[...mesesSet].sort().reverse().map(key => {
+            const [ano, mes] = key.split('-').map(Number);
+            const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+            const ehMesAtual = key === mesAtualKey;
+            return { valor: key, label: ehMesAtual ? `📅 ${labelCap} (em andamento)` : `📅 ${labelCap}` };
+        })
+    ];
+    abrirSeletor('Escolha o mês', opcoes, '', (valor) => {
+        if (valor === 'TODOS') { mesEspecificoAtivo = null; }
+        else {
+            const [ano, mes] = valor.split('-').map(Number);
+            const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            mesEspecificoAtivo = { ano, mes, label: label.charAt(0).toUpperCase() + label.slice(1) };
+        }
+        carregarDashboard(periodoDashboardSelecionado);
+    });
+}
+
 // ==========================================
-// 10. NOVA VENDA
+// 13. NOVA VENDA
 // ==========================================
 async function renderizarTelaNovaVenda() {
     menuAtivoId = 'novavenda';
     renderizarSidebar();
-
     carrinho = [];
     buscaSelecionadaIdx = -1;
     categoriaAtual = 'Todas';
@@ -1007,12 +922,10 @@ async function renderizarTelaNovaVenda() {
         supabaseClient.from('movimentos').select('produto').eq('tipo', 'venda').eq('cancelado', false)
             .order('criado_em', { ascending: false }).limit(500)
     ]);
-
     const vendedores = vendResp.data || [];
     const produtos = prodResp.data || [];
     const movimentos = movResp.data || [];
     vendedoresCache = vendedores;
-
     produtosCache = {};
     produtosInfo = {};
     listaProdutos = [];
@@ -1023,12 +936,9 @@ async function renderizarTelaNovaVenda() {
         listaProdutos.push({ nome: p.nome, preco: parseFloat(p.preco), categoria: p.categoria || 'Outros', modelo: p.modelo || '' });
         if (p.modelo) modelosSet.add(p.modelo);
     });
-
     const usados = new Set(listaProdutos.map(p => p.nome));
     const contagemHistorico = {};
-    movimentos.forEach(m => {
-        if (m.produto && m.produto !== 'Não informado') contagemHistorico[m.produto] = (contagemHistorico[m.produto] || 0) + 1;
-    });
+    movimentos.forEach(m => { if (m.produto && m.produto !== 'Não informado') contagemHistorico[m.produto] = (contagemHistorico[m.produto] || 0) + 1; });
     Object.keys(contagemHistorico).forEach(nome => {
         if (!usados.has(nome)) {
             listaProdutos.push({ nome, preco: 0, categoria: 'Outros', modelo: '' });
@@ -1050,13 +960,11 @@ async function renderizarTelaNovaVenda() {
     ];
     let botoesPagamento = pagamentos.map(p =>
         `<button type="button" class="btn-opcao ${p.id === 'Dinheiro' ? 'ativo' : ''}" data-pg="${p.id}" onclick="selecionarPagamento('${p.id}')">
-            <span class="icone-op">${p.icone}</span>
-            <span>${p.nome}</span>
+            <span class="icone-op">${p.icone}</span><span>${p.nome}</span>
         </button>`
     ).join('');
 
     const totalProdutos = listaProdutos.length;
-    const nomeVendedorVisivel = vendedorSelecionadoNome || '— Selecione o vendedor —';
 
     document.getElementById('app-container').innerHTML = `
         <div class="tela-venda">
@@ -1065,34 +973,26 @@ async function renderizarTelaNovaVenda() {
                     <button class="btn-voltar-inline" onclick="renderizarMenuPrincipal()">← Voltar</button>
                     <h2>Nova Venda</h2>
                 </div>
-
                 <button type="button" class="btn-seletor vazio" id="btn-vendedor-seletor" onclick="abrirSeletorVendedor()">
-                    <span class="seletor-label">${nomeVendedorVisivel}</span>
+                    <span class="seletor-label">— Selecione o vendedor —</span>
                     <span class="seletor-seta">▼</span>
                 </button>
-
                 <div class="categorias-wrap">${chipsCategoriaHtml}</div>
-
                 <div class="busca-wrapper">
-                    <input type="text" id="venda-busca" placeholder="🔎 Digitar produto..." 
-                           class="input-grande" autocomplete="off"
+                    <input type="text" id="venda-busca" placeholder="🔎 Digitar produto..." class="input-grande" autocomplete="off"
                            oninput="renderizarResultadosBusca(this.value)"
                            onkeydown="if(event.key==='Enter' && !document.getElementById('busca-resultados').classList.contains('ativo') && this.value.trim()){event.preventDefault(); adicionarProdutoLivre(this.value.trim());}">
                     <div class="busca-resultados" id="busca-resultados"></div>
                 </div>
-
                 ${totalProdutos > 0 ? `
                     <button type="button" class="btn-abrir-catalogo" onclick="abrirCatalogo()">
-                        📦 Ver todos os produtos
-                        <span class="contador">${totalProdutos}</span>
+                        📦 Ver todos os produtos <span class="contador">${totalProdutos}</span>
                     </button>
                 ` : ''}
             </div>
-
             <div class="venda-carrinho" id="carrinho-container">
                 <div class="carrinho-vazio">Adicione produtos para começar</div>
             </div>
-
             <div class="venda-rodape">
                 <div class="venda-total-linha">
                     <span class="label">Total</span>
@@ -1102,38 +1002,24 @@ async function renderizarTelaNovaVenda() {
                     <span class="label-mini">Comissão desta venda</span>
                     <span class="valor-comissao" id="venda-comissao-preview">R$ 0,00</span>
                 </div>
-                <div class="opcoes-grid cols-4" id="pagamento-opcoes">
-                    ${botoesPagamento}
-                </div>
+                <div class="opcoes-grid cols-4" id="pagamento-opcoes">${botoesPagamento}</div>
                 <button onclick="registrarVenda()" class="btn-primario btn-pill">REGISTRAR VENDA</button>
             </div>
         </div>`;
 
-    // Painel direito no PC
-    if (DISPOSITIVO === 'pc') {
-        atualizarPainelCarrinhoPC();
-    }
+    if (DISPOSITIVO === 'pc') atualizarPainelCarrinhoPC();
 }
 
 function abrirSeletorVendedor() {
-    if (vendedoresCache.length === 0) {
-        abrirModal('Atenção', 'Nenhum vendedor cadastrado.');
-        return;
-    }
-    const opcoes = vendedoresCache.map(v => ({
-        valor: v.id,
-        label: `${v.nome} (${v.comissao_percentual}%)`
-    }));
+    if (vendedoresCache.length === 0) { abrirModal('Atenção', 'Nenhum vendedor cadastrado.'); return; }
+    const opcoes = vendedoresCache.map(v => ({ valor: v.id, label: `${v.nome} (${v.comissao_percentual}%)` }));
     abrirSeletor('Selecionar Vendedor', opcoes, vendedorSelecionadoId, (valor) => {
         const v = vendedoresCache.find(x => x.id === valor);
         if (v) {
             vendedorSelecionadoId = v.id;
             vendedorSelecionadoNome = v.nome;
             const btn = document.getElementById('btn-vendedor-seletor');
-            if (btn) {
-                btn.classList.remove('vazio');
-                btn.querySelector('.seletor-label').textContent = `${v.nome} (${v.comissao_percentual}%)`;
-            }
+            if (btn) { btn.classList.remove('vazio'); btn.querySelector('.seletor-label').textContent = `${v.nome} (${v.comissao_percentual}%)`; }
             atualizarComissao();
         }
     });
@@ -1141,18 +1027,7 @@ function abrirSeletorVendedor() {
 
 function selecionarPagamento(pg) {
     if (pg === 'Crédito') {
-        const opcoes = [
-            { valor: '1', label: '💳 1x — À vista' },
-            { valor: '2', label: '💳 2x sem juros' },
-            { valor: '3', label: '💳 3x sem juros' },
-            { valor: '4', label: '💳 4x sem juros' },
-            { valor: '5', label: '💳 5x sem juros' },
-            { valor: '6', label: '💳 6x sem juros' },
-            { valor: '7', label: '💳 7x sem juros' },
-            { valor: '8', label: '💳 8x sem juros' },
-            { valor: '9', label: '💳 9x sem juros' },
-            { valor: '10', label: '💳 10x sem juros' }
-        ];
+        const opcoes = [1,2,3,4,5,6,7,8,9,10].map(n => ({ valor: String(n), label: `💳 ${n}x${n === 1 ? ' — À vista' : ' sem juros'}` }));
         abrirSeletor('Crédito em quantas vezes?', opcoes, String(parcelasSelecionadas), (valor) => {
             parcelasSelecionadas = parseInt(valor);
             pagamentoSelecionado = 'Crédito';
@@ -1164,6 +1039,7 @@ function selecionarPagamento(pg) {
                     if (label) label.textContent = parcelasSelecionadas === 1 ? 'Crédito' : `Crédito ${parcelasSelecionadas}x`;
                 }
             });
+            if (DISPOSITIVO === 'pc') atualizarPainelCarrinhoPC();
         });
         return;
     }
@@ -1176,13 +1052,12 @@ function selecionarPagamento(pg) {
             if (label) label.textContent = 'Crédito';
         }
     });
+    if (DISPOSITIVO === 'pc') atualizarPainelCarrinhoPC();
 }
 
 function selecionarCategoriaVenda(catId) {
     categoriaAtual = catId;
-    document.querySelectorAll('.chip-categoria').forEach(c => {
-        c.classList.toggle('ativo', c.dataset.cat === catId);
-    });
+    document.querySelectorAll('.chip-categoria').forEach(c => c.classList.toggle('ativo', c.dataset.cat === catId));
     const buscaInput = document.getElementById('venda-busca');
     if (buscaInput && buscaInput.value) renderizarResultadosBusca(buscaInput.value);
     else renderizarResultadosBusca('');
@@ -1198,20 +1073,17 @@ function renderizarResultadosBusca(termo) {
     if (!dropdown) return;
     termo = (termo || '').trim().toLowerCase();
     let base = filtrarPorCategoria(listaProdutos, categoriaAtual);
-
     if (!termo) {
         const primeiros = base.slice(0, 10);
         if (primeiros.length === 0) { dropdown.classList.remove('ativo'); return; }
         renderizarListaBusca(primeiros, false);
         return;
     }
-
     const filtrados = base.filter(p => {
         const nomeMatch = p.nome.toLowerCase().includes(termo);
         const modeloMatch = (p.modelo || '').toLowerCase().includes(termo);
         return nomeMatch || modeloMatch;
     }).slice(0, 15);
-
     if (filtrados.length === 0) {
         const catNome = categoriaAtual === 'Todas' ? '' : ` em ${categoriaAtual}`;
         dropdown.innerHTML = `<div class="busca-resultado-item" onclick="adicionarProdutoLivre('${termo.replace(/'/g, "\\'")}')">
@@ -1312,19 +1184,16 @@ function renderizarCarrinho() {
 function atualizarPainelCarrinhoPC() {
     const painel = document.getElementById('pc-painel-direito');
     if (!painel || DISPOSITIVO !== 'pc') return;
-
     const total = carrinho.reduce((acc, i) => acc + (i.valor || 0), 0);
     const v = vendedoresCache.find(x => x.id === vendedorSelecionadoId);
     const comissaoPct = v ? parseFloat(v.comissao_percentual) : 0;
     const comissaoValor = total * (comissaoPct / 100);
-
     const pagamentos = [
         { id: 'Dinheiro', nome: 'Dinheiro', icone: '💵' },
         { id: 'Pix', nome: 'Pix', icone: '📱' },
         { id: 'Débito', nome: 'Débito', icone: '💳' },
         { id: 'Crédito', nome: 'Crédito', icone: '💳' }
     ];
-
     painel.innerHTML = `
         <div class="pc-painel-header">
             <span class="pc-painel-titulo">CARRINHO</span>
@@ -1351,7 +1220,7 @@ function atualizarPainelCarrinhoPC() {
             <div class="pc-pagamentos">
                 ${pagamentos.map(p => `
                     <button type="button" class="pc-pagamento-btn ${p.id === pagamentoSelecionado ? 'ativo' : ''}" 
-                            data-pg="${p.id}" onclick="selecionarPagamentoPC('${p.id}')">
+                            data-pg="${p.id}" onclick="selecionarPagamento('${p.id}')">
                         <span>${p.icone}</span>
                         <span>${p.id === 'Crédito' && parcelasSelecionadas > 1 ? `Crédito ${parcelasSelecionadas}x` : p.nome}</span>
                     </button>
@@ -1361,21 +1230,6 @@ function atualizarPainelCarrinhoPC() {
         </div>
     `;
     painel.classList.add('ativo');
-}
-
-function selecionarPagamentoPC(pg) {
-    if (pg === 'Crédito') {
-        const opcoes = [1,2,3,4,5,6,7,8,9,10].map(n => ({ valor: String(n), label: `💳 ${n}x${n === 1 ? ' — À vista' : ' sem juros'}` }));
-        abrirSeletor('Crédito em quantas vezes?', opcoes, String(parcelasSelecionadas), (valor) => {
-            parcelasSelecionadas = parseInt(valor);
-            pagamentoSelecionado = 'Crédito';
-            atualizarPainelCarrinhoPC();
-        });
-        return;
-    }
-    pagamentoSelecionado = pg;
-    parcelasSelecionadas = 1;
-    atualizarPainelCarrinhoPC();
 }
 
 function atualizarTotais() {
@@ -1401,33 +1255,20 @@ function atualizarComissao() {
 async function registrarVenda() {
     if (!vendedorSelecionadoId) { abrirModal('Atenção', 'Selecione um vendedor.'); return; }
     if (carrinho.length === 0) { abrirModal('Atenção', 'Adicione pelo menos um produto.'); return; }
-
     const v = vendedoresCache.find(x => x.id === vendedorSelecionadoId);
     const comissaoPct = v ? parseFloat(v.comissao_percentual) : 0;
     const total = carrinho.reduce((acc, i) => acc + (i.valor || 0), 0);
     if (total <= 0) { abrirModal('Atenção', 'O total da venda está zerado.'); return; }
-
     const grupoVenda = (crypto.randomUUID ? crypto.randomUUID() : 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-
     const itens = carrinho.map(item => ({
-        caixa_id: caixaAtual.id,
-        tipo: 'venda',
-        valor: item.valor,
-        forma_pagamento: pagamentoSelecionado,
+        caixa_id: caixaAtual.id, tipo: 'venda', valor: item.valor, forma_pagamento: pagamentoSelecionado,
         parcelas: pagamentoSelecionado === 'Crédito' ? parcelasSelecionadas : 1,
-        produto: item.nome,
-        vendedor: vendedorSelecionadoNome,
-        vendedor_id: vendedorSelecionadoId,
-        comissao_percentual: comissaoPct,
-        comissao_valor: item.valor * (comissaoPct / 100),
-        grupo_venda: grupoVenda,
-        categoria: item.categoria || null,
-        modelo: item.modelo || null
+        produto: item.nome, vendedor: vendedorSelecionadoNome, vendedor_id: vendedorSelecionadoId,
+        comissao_percentual: comissaoPct, comissao_valor: item.valor * (comissaoPct / 100),
+        grupo_venda: grupoVenda, categoria: item.categoria || null, modelo: item.modelo || null
     }));
-
     const { error } = await supabaseClient.from('movimentos').insert(itens);
     if (error) { abrirModal('Erro', 'Erro ao registrar: ' + error.message); return; }
-
     const comissaoTotal = total * (comissaoPct / 100);
     const resumo = carrinho.map(i => `• ${i.nome}`).join('\n');
     const formaPgto = pagamentoSelecionado === 'Crédito' ? `Crédito ${parcelasSelecionadas}x` : pagamentoSelecionado;
@@ -1436,7 +1277,7 @@ async function registrarVenda() {
 }
 
 // ==========================================
-// 11. CATÁLOGO
+// 14. CATÁLOGO
 // ==========================================
 function abrirCatalogo() {
     document.getElementById('catalogo-busca').value = '';
@@ -1446,11 +1287,7 @@ function abrirCatalogo() {
     document.getElementById('modal-catalogo').classList.add('ativo');
     setTimeout(() => document.getElementById('catalogo-busca').focus(), 100);
 }
-
-function fecharCatalogo() {
-    document.getElementById('modal-catalogo').classList.remove('ativo');
-}
-
+function fecharCatalogo() { document.getElementById('modal-catalogo').classList.remove('ativo'); }
 function filtrarCatalogo(termo) { renderizarCatalogo(termo); }
 
 function renderizarTabsCatalogo() {
@@ -1460,15 +1297,11 @@ function renderizarTabsCatalogo() {
         `<button type="button" class="chip-categoria ${c.id === categoriaAtualCatalogo ? 'ativo' : ''}" data-cat="${c.id}" onclick="selecionarCategoriaCatalogo('${c.id}')">${c.icone} ${c.nome}</button>`
     ).join('');
 }
-
 function selecionarCategoriaCatalogo(catId) {
     categoriaAtualCatalogo = catId;
-    document.querySelectorAll('#catalogo-tabs .chip-categoria').forEach(c => {
-        c.classList.toggle('ativo', c.dataset.cat === catId);
-    });
+    document.querySelectorAll('#catalogo-tabs .chip-categoria').forEach(c => c.classList.toggle('ativo', c.dataset.cat === catId));
     renderizarCatalogo(document.getElementById('catalogo-busca').value);
 }
-
 function renderizarCatalogo(termo) {
     const container = document.getElementById('catalogo-lista');
     termo = (termo || '').trim().toLowerCase();
@@ -1501,7 +1334,6 @@ function renderizarCatalogo(termo) {
         `;
     }).join('');
 }
-
 function selecionarProdutoCatalogo(nome) {
     const preco = produtosCache[nome];
     if (preco !== undefined && preco > 0) {
@@ -1515,11 +1347,12 @@ function selecionarProdutoCatalogo(nome) {
 }
 
 // ==========================================
-// 12. SANGRIA E SUPRIMENTO
+// 15. SANGRIA E SUPRIMENTO
 // ==========================================
 function renderizarTelaSangria() {
     menuAtivoId = '';
     renderizarSidebar();
+    document.getElementById('pc-painel-direito').classList.remove('ativo');
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
@@ -1542,10 +1375,10 @@ async function registrarSangria() {
     abrirModal('Sucesso', 'Sangria registrada!');
     await renderizarMenuPrincipal();
 }
-
 function renderizarTelaSuprimento() {
     menuAtivoId = '';
     renderizarSidebar();
+    document.getElementById('pc-painel-direito').classList.remove('ativo');
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
@@ -1570,13 +1403,12 @@ async function registrarSuprimento() {
 }
 
 // ==========================================
-// 13. VENDEDORES
+// 16. VENDEDORES
 // ==========================================
 async function renderizarTelaVendedores() {
     menuAtivoId = 'vendedores';
     renderizarSidebar();
     document.getElementById('pc-painel-direito').classList.remove('ativo');
-
     const { data: vendedores, error } = await supabaseClient.from('vendedores').select('*').order('nome');
     if (error) { abrirModal('Erro', error.message); return; }
     let html = '';
@@ -1610,7 +1442,6 @@ async function renderizarTelaVendedores() {
             <button onclick="renderizarFormVendedor()" class="btn-primario btn-pill btn-full">➕ NOVO VENDEDOR</button>
         </div>`;
 }
-
 function renderizarFormVendedor(id = null, nome = '', comissao = 0, ativo = true) {
     const titulo = id ? 'Editar Vendedor' : 'Novo Vendedor';
     document.getElementById('app-container').innerHTML = `
@@ -1635,9 +1466,7 @@ function renderizarFormVendedor(id = null, nome = '', comissao = 0, ativo = true
 }
 function selecionarStatusVendedor(v) {
     document.getElementById('vend-ativo').value = v;
-    document.querySelectorAll('#vend-status-opcoes .btn-opcao').forEach(b => {
-        b.classList.toggle('ativo', b.dataset.st === v);
-    });
+    document.querySelectorAll('#vend-status-opcoes .btn-opcao').forEach(b => b.classList.toggle('ativo', b.dataset.st === v));
 }
 async function salvarVendedor(id) {
     const nome = document.getElementById('vend-nome').value.trim();
@@ -1667,13 +1496,12 @@ async function reativarVendedor(id) {
 }
 
 // ==========================================
-// 14. PRODUTOS
+// 17. PRODUTOS
 // ==========================================
 async function renderizarTelaProdutos() {
     menuAtivoId = 'produtos';
     renderizarSidebar();
     document.getElementById('pc-painel-direito').classList.remove('ativo');
-
     const { data: produtos, error } = await supabaseClient.from('produtos').select('*').order('categoria').order('nome');
     if (error) { abrirModal('Erro', 'Erro: ' + error.message); return; }
     let html = '';
@@ -1718,18 +1546,15 @@ async function renderizarTelaProdutos() {
             <button onclick="renderizarFormProduto()" class="btn-primario btn-pill btn-full">➕ NOVO PRODUTO</button>
         </div>`;
 }
-
 function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, categoriaSel = '', modeloSel = '') {
     const titulo = id ? 'Editar Produto' : 'Novo Produto';
     const catsForm = CATEGORIAS.filter(c => c.id !== 'Todas');
     let chipsCats = catsForm.map(c =>
         `<button type="button" class="chip-categoria ${c.id === categoriaSel ? 'ativo' : ''}" data-cat="${c.id}" onclick="selecionarCategoriaFormProduto('${c.id}')">${c.icone} ${c.nome}</button>`
     ).join('');
-
     let datalistModelos = '<datalist id="lista-modelos">';
     listaModelos.forEach(m => { datalistModelos += `<option value="${m}">`; });
     datalistModelos += '</datalist>';
-
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarTelaProdutos()">← Voltar</button>
@@ -1742,8 +1567,7 @@ function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, ca
                 </div>
                 <div class="form-group">
                     <label>📱 Modelo do Aparelho (opcional)</label>
-                    <input type="text" id="prod-modelo" class="input-grande" placeholder="Ex: iPhone 11" 
-                           value="${modeloSel}" list="lista-modelos" autocomplete="off">
+                    <input type="text" id="prod-modelo" class="input-grande" placeholder="Ex: iPhone 11" value="${modeloSel}" list="lista-modelos" autocomplete="off">
                     ${datalistModelos}
                 </div>
                 <div class="form-group">
@@ -1752,8 +1576,7 @@ function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, ca
                 </div>
                 <div class="form-group">
                     <label>💵 Preço Padrão (R$)</label>
-                    <input type="number" id="prod-preco" class="input-grande" placeholder="0,00" step="0.01" min="0" value="${preco}" 
-                           onkeydown="if(event.key==='Enter'){event.preventDefault(); salvarProduto('${id || ''}');}">
+                    <input type="number" id="prod-preco" class="input-grande" placeholder="0,00" step="0.01" min="0" value="${preco}" onkeydown="if(event.key==='Enter'){event.preventDefault(); salvarProduto('${id || ''}');}">
                 </div>
                 <div class="form-group">
                     <label>Status</label>
@@ -1769,16 +1592,12 @@ function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, ca
     setTimeout(() => document.getElementById('prod-nome').focus(), 100);
 }
 function selecionarCategoriaFormProduto(catId) {
-    document.querySelectorAll('#form-prod-categorias .chip-categoria').forEach(c => {
-        c.classList.toggle('ativo', c.dataset.cat === catId);
-    });
+    document.querySelectorAll('#form-prod-categorias .chip-categoria').forEach(c => c.classList.toggle('ativo', c.dataset.cat === catId));
     document.getElementById('prod-categoria').value = catId;
 }
 function selecionarStatusProduto(v) {
     document.getElementById('prod-ativo').value = v;
-    document.querySelectorAll('#prod-status-opcoes .btn-opcao').forEach(b => {
-        b.classList.toggle('ativo', b.dataset.st === v);
-    });
+    document.querySelectorAll('#prod-status-opcoes .btn-opcao').forEach(b => b.classList.toggle('ativo', b.dataset.st === v));
 }
 async function salvarProduto(id) {
     const nome = document.getElementById('prod-nome').value.trim();
@@ -1811,16 +1630,14 @@ async function reativarProduto(id) {
 }
 
 // ==========================================
-// 15. HISTÓRICO
+// 18. HISTÓRICO
 // ==========================================
 async function renderizarHistorico() {
     menuAtivoId = 'historico';
     renderizarSidebar();
     document.getElementById('pc-painel-direito').classList.remove('ativo');
-
     const { data: vendedores } = await supabaseClient.from('vendedores').select('nome').order('nome');
     vendedoresCache = (vendedores || []).map(v => ({ id: v.nome, nome: v.nome, comissao_percentual: 0 }));
-
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
@@ -1847,7 +1664,6 @@ async function renderizarHistorico() {
         </div>`;
     await buscarMovimentosHistorico('hoje');
 }
-
 function abrirSeletorHistVendedor() {
     const opcoes = [{ valor: '', label: 'Todos os vendedores' }, ...vendedoresCache.map(v => ({ valor: v.nome, label: v.nome }))];
     const atual = document.getElementById('hist-vendedor').value;
@@ -1859,7 +1675,6 @@ function abrirSeletorHistVendedor() {
         buscarMovimentosHistorico(document.querySelector('.filtro-btn.ativo').dataset.periodo);
     });
 }
-
 async function aplicarFiltroHistorico(periodo, lerInputs = false) {
     document.querySelectorAll('.filtro-btn').forEach(b => b.classList.toggle('ativo', b.dataset.periodo === periodo));
     const rangeDiv = document.getElementById('range-historico');
@@ -1867,7 +1682,6 @@ async function aplicarFiltroHistorico(periodo, lerInputs = false) {
     else rangeDiv.classList.remove('ativo');
     await buscarMovimentosHistorico(periodo);
 }
-
 async function buscarMovimentosHistorico(periodo) {
     let range;
     if (periodo === 'personalizado') {
@@ -1875,16 +1689,13 @@ async function buscarMovimentosHistorico(periodo) {
         if (!di || !df) { abrirModal('Atenção', 'Informe as duas datas.'); return; }
         range = obterRangePeriodo('personalizado', di, df);
     } else range = obterRangePeriodo(periodo);
-
     const vendedorFiltro = document.getElementById('hist-vendedor')?.value || '';
     let query = supabaseClient.from('movimentos').select('*')
         .gte('criado_em', range.inicio).lte('criado_em', range.fim)
         .order('criado_em', { ascending: false });
     if (vendedorFiltro) query = query.eq('vendedor', vendedorFiltro);
-
     const { data: movimentos, error } = await query;
     if (error) { abrirModal('Erro', error.message); return; }
-
     let html = '';
     if (!movimentos || movimentos.length === 0) {
         html = '<p class="subtitulo">Nenhum movimento no período.</p>';
@@ -1923,7 +1734,6 @@ async function buscarMovimentosHistorico(periodo) {
     }
     document.getElementById('lista-historico').innerHTML = html;
 }
-
 function cancelarVenda(id) {
     abrirModal('Cancelar Venda', 'Tem certeza? O valor sairá do total.', async () => {
         const { error } = await supabaseClient.from('movimentos').update({ cancelado: true }).eq('id', id);
@@ -1934,16 +1744,14 @@ function cancelarVenda(id) {
 }
 
 // ==========================================
-// 16. COMISSÕES (com gráfico de barras)
+// 19. COMISSÕES
 // ==========================================
 async function renderizarRelatorioComissoes() {
     menuAtivoId = 'comissoes';
     renderizarSidebar();
     document.getElementById('pc-painel-direito').classList.remove('ativo');
-
     const { data: vendedores } = await supabaseClient.from('vendedores').select('nome').order('nome');
     vendedoresCache = (vendedores || []).map(v => ({ id: v.nome, nome: v.nome, comissao_percentual: 0 }));
-
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
@@ -1970,7 +1778,6 @@ async function renderizarRelatorioComissoes() {
         </div>`;
     await buscarComissoes('hoje');
 }
-
 function abrirSeletorComVendedor() {
     const opcoes = [{ valor: '', label: 'Todos os vendedores' }, ...vendedoresCache.map(v => ({ valor: v.nome, label: v.nome }))];
     const atual = document.getElementById('com-vendedor').value;
@@ -1982,7 +1789,6 @@ function abrirSeletorComVendedor() {
         buscarComissoes(document.querySelector('.filtro-btn.ativo').dataset.periodo);
     });
 }
-
 async function aplicarFiltroComissao(periodo, lerInputs = false) {
     document.querySelectorAll('.filtro-btn').forEach(b => b.classList.toggle('ativo', b.dataset.periodo === periodo));
     const rangeDiv = document.getElementById('range-comissao');
@@ -1990,7 +1796,6 @@ async function aplicarFiltroComissao(periodo, lerInputs = false) {
     else rangeDiv.classList.remove('ativo');
     await buscarComissoes(periodo);
 }
-
 async function buscarComissoes(periodo) {
     let range;
     if (periodo === 'personalizado') {
@@ -1998,16 +1803,13 @@ async function buscarComissoes(periodo) {
         if (!di || !df) { abrirModal('Atenção', 'Informe as duas datas.'); return; }
         range = obterRangePeriodo('personalizado', di, df);
     } else range = obterRangePeriodo(periodo);
-
     const vendedorFiltro = document.getElementById('com-vendedor')?.value || '';
     let query = supabaseClient.from('movimentos').select('vendedor, valor, comissao_valor, cancelado')
         .eq('tipo', 'venda').eq('cancelado', false)
         .gte('criado_em', range.inicio).lte('criado_em', range.fim);
     if (vendedorFiltro) query = query.eq('vendedor', vendedorFiltro);
-
     const { data: movimentos, error } = await query;
     if (error) { abrirModal('Erro', error.message); return; }
-
     const resumo = {};
     (movimentos || []).forEach(m => {
         const v = m.vendedor || 'Não informado';
@@ -2016,7 +1818,6 @@ async function buscarComissoes(periodo) {
         resumo[v].comissao += parseFloat(m.comissao_valor || 0);
         resumo[v].qtd += 1;
     });
-
     let html = '';
     const entradas = Object.entries(resumo);
     if (entradas.length === 0) {
@@ -2045,16 +1846,14 @@ async function buscarComissoes(periodo) {
 }
 
 // ==========================================
-// 17. FECHAR CAIXA (com doughnut)
+// 20. FECHAR CAIXA
 // ==========================================
 async function renderizarTelaFecharCaixa() {
     menuAtivoId = '';
     renderizarSidebar();
     document.getElementById('pc-painel-direito').classList.remove('ativo');
-
     const { data: movimentos } = await supabaseClient.from('movimentos').select('*')
         .eq('caixa_id', caixaAtual.id).eq('cancelado', false);
-
     let totDin = 0, totPix = 0, totDeb = 0, totCred = 0, totSan = 0, totSup = 0, totCom = 0;
     (movimentos || []).forEach(m => {
         const v = parseFloat(m.valor);
@@ -2069,48 +1868,35 @@ async function renderizarTelaFecharCaixa() {
     });
     const dinheiroEsperado = parseFloat(caixaAtual.valor_inicial) + totDin + totSup - totSan;
     const totalGeral = totDin + totPix + totDeb + totCred;
-
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
             <h2>Fechar Caixa</h2>
-            
             <div class="card-grafico">
-                <div class="card-grafico-header">
-                    <span class="card-grafico-titulo">Resumo por Pagamento</span>
-                </div>
-                <div class="card-grafico-canvas-doughnut">
-                    <canvas id="grafico-pagamentos"></canvas>
-                </div>
+                <div class="card-grafico-header"><span class="card-grafico-titulo">Resumo por Pagamento</span></div>
+                <div class="card-grafico-canvas-doughnut"><canvas id="grafico-pagamentos"></canvas></div>
             </div>
-
             <div class="lista-pagamentos">
                 <div class="item-pagamento"><div class="info">💵 Dinheiro</div><div class="valor">${formatarMoeda(totDin)}</div></div>
                 <div class="item-pagamento"><div class="info">📱 Pix</div><div class="valor">${formatarMoeda(totPix)}</div></div>
                 <div class="item-pagamento"><div class="info">💳 Débito</div><div class="valor">${formatarMoeda(totDeb)}</div></div>
                 <div class="item-pagamento"><div class="info">💳 Crédito</div><div class="valor">${formatarMoeda(totCred)}</div></div>
             </div>
-
             <div class="card-resumo card-destaque" style="padding: 1rem;">
                 <span>Total de Comissões</span>
                 <strong style="font-size:1.3rem;">${formatarMoeda(totCom)}</strong>
             </div>
-
             <div class="card-resumo">
                 <span>Dinheiro Esperado na Gaveta</span>
                 <strong>${formatarMoeda(dinheiroEsperado)}</strong>
             </div>
-
             <div class="form-group">
                 <label>💵 Valor Contado (R$)</label>
-                <input type="number" id="fechamento-valor-contado" placeholder="0,00" step="0.01" class="input-grande" 
+                <input type="number" id="fechamento-valor-contado" placeholder="0,00" step="0.01" class="input-grande"
                        onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmarFechamento(${dinheiroEsperado});}">
             </div>
-
             <button onclick="confirmarFechamento(${dinheiroEsperado})" class="btn-primario btn-pill">FECHAR CAIXA</button>
         </div>`;
-
-    // Doughnut chart
     setTimeout(() => {
         const ctx = document.getElementById('grafico-pagamentos');
         if (!ctx || totalGeral <= 0) return;
@@ -2122,14 +1908,11 @@ async function renderizarTelaFecharCaixa() {
                 datasets: [{
                     data: [totDin, totPix, totDeb, totCred],
                     backgroundColor: ['#FACC15', '#10B981', '#3B82F6', '#8B5CF6'],
-                    borderColor: '#0A0A0A',
-                    borderWidth: 3
+                    borderColor: '#0A0A0A', borderWidth: 3
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '65%',
+                responsive: true, maintainAspectRatio: false, cutout: '65%',
                 plugins: {
                     legend: { position: 'bottom', labels: { color: '#8A8A8A', font: { size: 11 }, padding: 12, boxWidth: 10, boxHeight: 10 } },
                     tooltip: { callbacks: { label: (c) => `${c.label}: ${formatarMoeda(c.parsed)}` } }
@@ -2138,13 +1921,11 @@ async function renderizarTelaFecharCaixa() {
         });
     }, 50);
 }
-
 async function confirmarFechamento(dinheiroEsperado) {
     const valorContado = parseFloat(document.getElementById('fechamento-valor-contado').value);
     if (isNaN(valorContado)) { abrirModal('Atenção', 'Informe o valor contado.'); return; }
     const diferenca = valorContado - dinheiroEsperado;
     const statusDif = diferenca >= 0 ? 'Sobra' : 'Falta';
-
     abrirModal('Confirmar Fechamento', `${statusDif}: ${formatarMoeda(Math.abs(diferenca))}\n\nDeseja fechar o caixa?`, async () => {
         const { error } = await supabaseClient.from('caixas').update({
             fechado_em: new Date().toISOString(), valor_contado: valorContado, diferenca, status: 'fechado'
@@ -2157,111 +1938,4 @@ async function confirmarFechamento(dinheiroEsperado) {
         abrirModal('Sucesso', 'Caixa fechado!');
         renderizarTelaAbrirCaixa();
     });
-}
-// ==========================================
-// SELETOR DE MÊS ESPECÍFICO
-// ==========================================
-async function abrirSeletorMes() {
-    const { data: movimentos } = await supabaseClient.from('movimentos')
-        .select('criado_em').eq('tipo', 'venda').eq('cancelado', false)
-        .order('criado_em', { ascending: false });
-    
-    const agora = new Date();
-    const mesAtualKey = `${agora.getFullYear()}-${agora.getMonth()}`;
-    
-    const mesesSet = new Set();
-    (movimentos || []).forEach(m => {
-        const d = new Date(m.criado_em);
-        mesesSet.add(`${d.getFullYear()}-${d.getMonth()}`);
-    });
-    
-    if (mesesSet.size === 0) {
-        abrirModal('Aviso', 'Nenhuma venda registrada ainda. Faça sua primeira venda para usar o filtro por mês.');
-        return;
-    }
-    
-    const opcoes = [
-        { valor: 'TODOS', label: '🔄 Ver período normal' },
-        ...[...mesesSet].sort().reverse().map(key => {
-            const [ano, mes] = key.split('-').map(Number);
-            const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
-            const ehMesAtual = key === mesAtualKey;
-            return { 
-                valor: key, 
-                label: ehMesAtual ? `📅 ${labelCap} (em andamento)` : `📅 ${labelCap}`
-            };
-        })
-    ];
-    
-    abrirSeletor('Escolha o mês', opcoes, '', (valor) => {
-        if (valor === 'TODOS') {
-            mesEspecificoAtivo = null;
-        } else {
-            const [ano, mes] = valor.split('-').map(Number);
-            const label = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            mesEspecificoAtivo = { ano, mes, label: label.charAt(0).toUpperCase() + label.slice(1) };
-        }
-        carregarDashboard(periodoDashboardSelecionado);
-    });
-}
-
-// ==========================================
-// SPARKLINE (mini gráfico no KPI)
-// ==========================================
-function gerarSparkline(valores) {
-    if (!valores || valores.length === 0) return '';
-    const max = Math.max(...valores, 1);
-    const w = 100, h = 40;
-    const stepX = w / Math.max(valores.length - 1, 1);
-    let pathFill = `M 0 ${h}`;
-    let pathLine = '';
-    valores.forEach((v, i) => {
-        const x = i * stepX;
-        const y = h - (v/max)*h;
-        pathFill += ` L ${x} ${y}`;
-        pathLine += (i === 0 ? `M` : ` L`) + ` ${x} ${y}`;
-    });
-    pathFill += ` L ${w} ${h} Z`;
-    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <path d="${pathFill}" fill="rgba(250,204,21,0.15)" stroke="none"/>
-        <path d="${pathLine}" stroke="#FACC15" stroke-width="2" fill="none"/>
-    </svg>`;
-}
-
-// ==========================================
-// GRÁFICO DE CATEGORIAS (doughnut)
-// ==========================================
-function desenharGraficoCategorias(catValor) {
-    const ctx = document.getElementById('grafico-categorias');
-    if (!ctx) return;
-    destruirGrafico('categorias');
-    const cores = ['#FACC15', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4'];
-    graficosAtivos['categorias'] = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(catValor),
-            datasets: [{
-                data: Object.values(catValor),
-                backgroundColor: cores.slice(0, Object.keys(catValor).length),
-                borderColor: '#0A0A0A',
-                borderWidth: 3
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false, cutout: '60%',
-            plugins: {
-                legend: { position: 'right', labels: { color: '#8A8A8A', font: { size: 11 }, padding: 8, boxWidth: 10, boxHeight: 10 } },
-                tooltip: { callbacks: { label: (c) => `${c.label}: ${formatarMoeda(c.parsed)}` } }
-            }
-        }
-    });
-}
-// ==========================================
-// INTERAÇÃO COM FILTROS DO DASHBOARD
-// ==========================================
-async function alterarPeriodoDashboard(periodo) {
-    mesEspecificoAtivo = null;
-    periodoDashboardSelecionado = periodo;
-    await carregarDashboard(periodo);
 }
