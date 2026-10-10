@@ -2167,3 +2167,233 @@ canvas { display: block; max-width: 100%; }
         overflow-x: hidden;
     }
 }
+/* ==========================================
+   AJUSTES PARA CELULARES MENORES
+   ========================================== */
+
+/* Telas pequenas: 361px a 400px (iPhone 11, 12, 13, 14 padrão) */
+@media (max-width: 400px) and (min-width: 361px) {
+    html { font-size: 15px; }
+    
+    .mobile-header {
+        padding: 0.8rem 0.9rem 0.6rem;
+    }
+    .mobile-header h1 { font-size: 1.2rem; letter-spacing: 1px; }
+    .header-tag { font-size: 0.55rem; padding: 0.22rem 0.45rem; }
+    .relogio {
+        font-size: 0.9rem;
+        min-width: 68px;
+        padding: 0.22rem 0.45rem;
+    }
+    .btn-download-discreto { width: 32px; height: 32px; font-size: 0.85rem; }
+    .header-operador { font-size: 0.78rem; }
+    .gaveta-chip { font-size: 0.68rem; padding: 0.25rem 0.6rem; }
+    
+    /* Filtros do dashboard */
+    .dashboard-filtros-wrapper {
+        gap: 0.4rem;
+    }
+    .filtro-periodo-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.72rem;
+    }
+    .btn-filtro-extra {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.72rem;
+    }
+    
+    /* Cards KPIs */
+    .tela-menu .card-resumo {
+        padding: 1rem;
+    }
+    .tela-menu .card-resumo strong { font-size: 1.75rem; }
+    .tela-menu .card-resumo span { font-size: 0.7rem; }
+    .metricas-mini { font-size: 0.68rem; }
+    
+    /* Botão Nova Venda */
+    .btn-nova-venda {
+        padding: 1rem;
+        font-size: 1rem;
+    }
+    
+    /* Grid de ações */
+    .grid-botoes-3 { gap: 0.45rem; }
+    .grid-botoes-3 button {
+        min-height: 72px;
+        font-size: 0.62rem;
+        padding: 0.7rem 0.3rem;
+        letter-spacing: 0.3px;
+    }
+    .grid-botoes-3 button .icone-btn { font-size: 1.25rem; }
+    
+    /* Botão fechar caixa */
+    .btn-fechar-caixa {
+        padding: 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Gráfico */
+    .card-grafico { padding: 0.85rem; }
+    .card-grafico-titulo { font-size: 0.68rem; }
+    .card-grafico-canvas { height: 120px; }
+    .grafico-legenda { font-size: 0.65rem; gap: 0.8rem; }
+    
+    /* Nova Venda */
+    .venda-topo { padding: 0.7rem 0.85rem 0.6rem; }
+    .venda-header h2 { font-size: 1.05rem; }
+    .venda-topo .input-grande {
+        padding: 0.7rem 0.85rem;
+        font-size: 0.88rem;
+    }
+    .venda-topo .btn-seletor {
+        padding: 0.75rem 0.9rem;
+        font-size: 0.88rem;
+    }
+    .chip-categoria {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.68rem;
+    }
+    .btn-abrir-catalogo {
+        padding: 0.7rem 0.9rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Carrinho */
+    .venda-carrinho { padding: 0.6rem 0.85rem; gap: 0.4rem; }
+    .item-carrinho { padding: 0.6rem 0.7rem; gap: 0.4rem; }
+    .item-carrinho .nome-item { font-size: 0.8rem; }
+    .item-carrinho .valor-input {
+        width: 70px;
+        font-size: 0.82rem;
+        padding: 0.4rem 0.4rem;
+    }
+    .item-carrinho .btn-remover { font-size: 0.85rem; padding: 0.25rem 0.4rem; }
+    
+    /* Rodapé venda */
+    .venda-rodape { padding: 0.75rem 0.85rem 0.9rem; gap: 0.45rem; }
+    .venda-total-linha .valor-total { font-size: 1.5rem; }
+    .venda-total-linha .label { font-size: 0.68rem; }
+    .venda-comissao-linha { font-size: 0.7rem; }
+    .btn-opcao {
+        padding: 0.65rem 0.3rem;
+        font-size: 0.68rem;
+        gap: 0.2rem;
+    }
+    .btn-opcao .icone-op { font-size: 1.1rem; }
+    .venda-rodape .btn-pill { padding: 0.85rem; font-size: 0.92rem; }
+    
+    /* Modais */
+    .modal-box { padding: 1.1rem; }
+    .modal-box h3 { font-size: 1.05rem; }
+    .seletor-opcao { padding: 0.8rem 0.9rem; font-size: 0.88rem; }
+}
+
+/* Telas muito pequenas: 320px a 360px (iPhone SE 1ª ger, Galaxy S8, iPhone 12 Mini) */
+@media (max-width: 360px) {
+    html { font-size: 14px; }
+    
+    .mobile-header { padding: 0.7rem 0.8rem 0.55rem; }
+    .mobile-header h1 { font-size: 1.1rem; letter-spacing: 0.5px; }
+    .header-tag { font-size: 0.5rem; padding: 0.2rem 0.4rem; }
+    .relogio {
+        font-size: 0.82rem;
+        min-width: 60px;
+        padding: 0.2rem 0.4rem;
+    }
+    .btn-download-discreto { width: 30px; height: 30px; font-size: 0.8rem; }
+    .header-operador { font-size: 0.72rem; }
+    .gaveta-chip {
+        font-size: 0.62rem;
+        padding: 0.22rem 0.5rem;
+        gap: 0.2rem;
+    }
+    
+    /* Filtros scrolláveis sem estourar */
+    .dashboard-filtros {
+        padding: 0.3rem;
+        gap: 0.2rem;
+    }
+    .filtro-periodo-btn {
+        padding: 0.45rem 0.7rem;
+        font-size: 0.68rem;
+    }
+    .btn-filtro-extra {
+        padding: 0.45rem 0.7rem;
+        font-size: 0.68rem;
+    }
+    
+    /* KPIs ainda menores */
+    .tela-menu .card-resumo { padding: 0.85rem; }
+    .tela-menu .card-resumo strong { font-size: 1.55rem; }
+    .metricas-mini { font-size: 0.62rem; }
+    
+    .btn-nova-venda {
+        padding: 0.9rem;
+        font-size: 0.92rem;
+    }
+    
+    .grid-botoes-3 { gap: 0.35rem; }
+    .grid-botoes-3 button {
+        min-height: 68px;
+        font-size: 0.58rem;
+        padding: 0.6rem 0.25rem;
+    }
+    .grid-botoes-3 button .icone-btn { font-size: 1.15rem; }
+    
+    .btn-fechar-caixa {
+        padding: 0.65rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Gráfico */
+    .card-grafico { padding: 0.75rem; }
+    .card-grafico-canvas { height: 110px; }
+    .grafico-legenda { font-size: 0.6rem; }
+    
+    /* Venda */
+    .venda-topo { padding: 0.6rem 0.75rem 0.5rem; gap: 0.4rem; }
+    .venda-header h2 { font-size: 1rem; }
+    .venda-topo .input-grande {
+        padding: 0.65rem 0.75rem;
+        font-size: 0.85rem;
+    }
+    .venda-topo .btn-seletor {
+        padding: 0.7rem 0.85rem;
+        font-size: 0.85rem;
+    }
+    .chip-categoria {
+        padding: 0.35rem 0.55rem;
+        font-size: 0.62rem;
+    }
+    
+    .venda-carrinho { padding: 0.5rem 0.75rem; }
+    .item-carrinho { padding: 0.55rem 0.6rem; }
+    .item-carrinho .nome-item { font-size: 0.75rem; }
+    .item-carrinho .valor-input {
+        width: 62px;
+        font-size: 0.78rem;
+    }
+    
+    .venda-rodape { padding: 0.65rem 0.75rem 0.8rem; }
+    .venda-total-linha .valor-total { font-size: 1.35rem; }
+    .btn-opcao {
+        padding: 0.55rem 0.25rem;
+        font-size: 0.62rem;
+    }
+    .btn-opcao .icone-op { font-size: 1rem; }
+    .venda-rodape .btn-pill { padding: 0.8rem; font-size: 0.85rem; }
+    
+    /* Modais mais compactos */
+    .modal-box { padding: 1rem; max-width: calc(100vw - 1.5rem); }
+    .modal-box h3 { font-size: 0.95rem; }
+    .seletor-opcao { padding: 0.75rem 0.85rem; font-size: 0.82rem; }
+    
+    /* Catálogo */
+    .catalogo-header { padding: 0.75rem 0.85rem; }
+    .catalogo-header h3 { font-size: 1rem; }
+    .catalogo-busca-wrapper { padding: 0.5rem 0.85rem; }
+    .catalogo-lista { padding: 0.6rem 0.85rem 1.5rem; }
+    .item-catalogo { padding: 0.75rem 0.85rem; }
+    .item-catalogo .nome-produto { font-size: 0.85rem; }
+    .item-catalogo .preco-produto { font-size: 0.88rem; }
+}
