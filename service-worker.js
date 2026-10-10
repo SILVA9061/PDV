@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brtest-pdv-v11';
+const CACHE_NAME = 'brtest-pdv-v1.2';
 const ARQUIVOS_CACHE = ['./', './index.html', './style.css', './app.js', './manifest.json', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'];
 
 self.addEventListener('install', (event) => {
