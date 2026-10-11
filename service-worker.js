@@ -1,7 +1,7 @@
 // ==========================================
-// SERVICE WORKER - BR TEST PDV - v1.0
+// SERVICE WORKER - BR TEST PDV - v1.1
 // ==========================================
-const CACHE_NAME = 'brtest-pdv-v1.0';
+const CACHE_NAME = 'brtest-pdv-v1.1';
 const ARQUIVOS_CACHE = [
     './',
     './index.html',
