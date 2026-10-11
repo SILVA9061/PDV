@@ -23,7 +23,9 @@
 </head>
 <body>
 
-    <!-- SIDEBAR PC -->
+    <!-- ============================================
+         SIDEBAR PC (só aparece em telas ≥1100px)
+         ============================================ -->
     <aside id="pc-sidebar" class="pc-sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">BR <span>TEST</span></div>
@@ -56,8 +58,12 @@
         </div>
     </aside>
 
-    <!-- APP PRINCIPAL -->
+    <!-- ============================================
+         WRAPPER PRINCIPAL
+         ============================================ -->
     <div class="app-wrapper">
+
+        <!-- Header Mobile/Tablet (some no PC) -->
         <header id="main-header" class="mobile-header">
             <div class="header-topo">
                 <div class="header-logo-wrap">
@@ -77,12 +83,16 @@
             </div>
         </header>
 
+        <!-- Área principal onde tudo é renderizado via JS -->
         <main id="app-container" class="app-main"></main>
 
+        <!-- Painel direito PC (atividade recente / carrinho) -->
         <aside id="pc-painel-direito" class="pc-painel-direito"></aside>
     </div>
 
-    <!-- MODAL DE AVISOS -->
+    <!-- ============================================
+         MODAL DE AVISOS (genérico)
+         ============================================ -->
     <div id="modal-overlay" class="modal-overlay">
         <div class="modal-box">
             <h3 id="modal-titulo">Aviso</h3>
@@ -94,7 +104,9 @@
         </div>
     </div>
 
-    <!-- MODAL DE VALOR -->
+    <!-- ============================================
+         MODAL DE VALOR (produto sem preço cadastrado)
+         ============================================ -->
     <div id="modal-valor" class="modal-overlay">
         <div class="modal-box">
             <h3 id="modal-valor-titulo">Informe o valor</h3>
@@ -107,7 +119,9 @@
         </div>
     </div>
 
-    <!-- MODAL SELETOR -->
+    <!-- ============================================
+         MODAL SELETOR GENÉRICO
+         ============================================ -->
     <div id="modal-seletor" class="modal-overlay">
         <div class="modal-box modal-seletor-box">
             <h3 id="seletor-titulo">Selecione</h3>
@@ -116,7 +130,9 @@
         </div>
     </div>
 
-    <!-- MODAL DE CATÁLOGO -->
+    <!-- ============================================
+         MODAL DE CATÁLOGO (tela cheia)
+         ============================================ -->
     <div id="modal-catalogo" class="modal-catalogo">
         <div class="catalogo-header">
             <h3>📦 Catálogo</h3>
@@ -128,8 +144,24 @@
         <div id="catalogo-tabs" class="catalogo-tabs-wrapper"></div>
         <div class="catalogo-lista" id="catalogo-lista"></div>
     </div>
+    
+        <!-- ============================================
+         MODAL DE DETALHE DO VENDEDOR
+         ============================================ -->
+    <div id="modal-detalhe-vendedor" class="modal-catalogo">
+        <div class="catalogo-header">
+            <h3 id="detalhe-vendedor-titulo">Detalhe do Vendedor</h3>
+            <button class="btn-fechar-catalogo" onclick="fecharDetalheVendedor()">✕</button>
+        </div>
+        <div class="detalhe-vendedor-info">
+            <span id="detalhe-vendedor-periodo">—</span>
+        </div>
+        <div class="catalogo-lista" id="detalhe-vendedor-lista"></div>
+    </div>
 
-    <!-- MODAL DE DOWNLOADS -->
+    <!-- ============================================
+         MODAL DE DOWNLOADS
+         ============================================ -->
     <div id="modal-downloads" class="modal-overlay">
         <div class="modal-box">
             <h3>⬇ Baixar o App</h3>
@@ -150,6 +182,9 @@
         </div>
     </div>
 
+    <!-- ============================================
+         SCRIPTS
+         ============================================ -->
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

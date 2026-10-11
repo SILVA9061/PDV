@@ -54,6 +54,7 @@ const MENU_ITENS = [
     { id: 'historico', label: 'Histórico', icone: '📋', acao: 'renderizarHistorico' },
     { id: 'comissoes', label: 'Comissões', icone: '💰', acao: 'renderizarRelatorioComissoes' },
     { id: 'vendedores', label: 'Vendedores', icone: '👥', acao: 'renderizarTelaVendedores' },
+    { id: 'aparelhos', label: 'Aparelhos', icone: '📱', acao: 'renderizarTelaAparelhos' },
     { id: 'produtos', label: 'Produtos', icone: '📦', acao: 'renderizarTelaProdutos' }
 ];
 
@@ -83,6 +84,8 @@ let menuAtivoId = 'dashboard';
 let graficosAtivos = {};
 let periodoDashboardSelecionado = 'hoje';
 let mesEspecificoAtivo = null;
+let ultimosMovimentosComissao = [];
+let periodoAtualComissao = 'hoje';
 
 // ==========================================
 // 3. UTILITÁRIOS
@@ -271,12 +274,17 @@ function obterRangePeriodo(periodo, dataInicio = null, dataFim = null) {
 // 6. ATALHOS DE TECLADO
 // ==========================================
 document.addEventListener('keydown', (e) => {
-    const modalCatalogo = document.getElementById('modal-catalogo').classList.contains('ativo');
+    const modalDetalhe = document.getElementById('modal-detalhe-vendedor')?.classList.contains('ativo');
+    if (modalDetalhe) {
+        if (e.key === 'Escape') { e.preventDefault(); fecharDetalheVendedor(); }
+        return;
+    }
+    const modalCatalogo = document.getElementById('modal-catalogo')?.classList.contains('ativo');
     if (modalCatalogo) { if (e.key === 'Escape') { e.preventDefault(); fecharCatalogo(); } return; }
-    const modalAviso = document.getElementById('modal-overlay').classList.contains('ativo');
-    const modalDown = document.getElementById('modal-downloads').classList.contains('ativo');
-    const modalValor = document.getElementById('modal-valor').classList.contains('ativo');
-    const modalSeletor = document.getElementById('modal-seletor').classList.contains('ativo');
+    const modalAviso = document.getElementById('modal-overlay')?.classList.contains('ativo');
+    const modalDown = document.getElementById('modal-downloads')?.classList.contains('ativo');
+    const modalValor = document.getElementById('modal-valor')?.classList.contains('ativo');
+    const modalSeletor = document.getElementById('modal-seletor')?.classList.contains('ativo');
     if (modalAviso || modalDown || modalValor || modalSeletor) {
         const tempo = Date.now() - modalAbertoEm;
         if (e.key === 'Escape') { e.preventDefault();
@@ -315,7 +323,8 @@ document.addEventListener('keydown', (e) => {
             'F6': () => renderizarRelatorioComissoes(),
             'F7': () => renderizarTelaVendedores(),
             'F8': () => renderizarTelaFecharCaixa(),
-            'F9': () => renderizarTelaProdutos()
+            'F9': () => renderizarTelaProdutos(),
+            'F10': () => renderizarTelaAparelhos()
         };
         if (atalhos[e.key]) { e.preventDefault(); atalhos[e.key](); }
     }
@@ -325,6 +334,7 @@ document.addEventListener('keydown', (e) => {
 // 7. INICIALIZAÇÃO
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 App BR Test iniciado!');
     iniciarRelogio();
     renderizarSidebar();
     await verificarCaixaAberto();
@@ -395,7 +405,7 @@ async function abrirCaixa() {
 }
 
 // ==========================================
-// 9. MENU / DASHBOARD
+// 9. DASHBOARD / MENU
 // ==========================================
 async function renderizarMenuPrincipal() {
     menuAtivoId = 'dashboard';
@@ -449,7 +459,6 @@ async function carregarDashboard(periodo) {
         inicioAnterior = new Date(fimAnterior.getFullYear(), fimAnterior.getMonth(), 1, 0, 0, 0);
         labelAtual = 'mês passado'; labelAnterior = 'mês retrasado';
     } else {
-        // Fallback
         inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
         fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59);
         inicioAnterior = new Date(inicio.getTime() - 24 * 3600000);
@@ -484,7 +493,6 @@ async function carregarDashboard(periodo) {
     const varTicket = calcVar(ticket, ticketAnt);
     const varComissao = calcVar(totalComissoes, totalComissoesAnt);
 
-    // Gráfico
     const labels = [], valoresAtual = [], valoresAnterior = [];
     if (periodo === 'hoje' && !mesEspecificoAtivo) {
         for (let h = 0; h < 24; h++) {
@@ -523,12 +531,10 @@ async function carregarDashboard(periodo) {
         }
     }
 
-    // Top produtos
     const prodQtd = {};
     movAtual.forEach(m => { const p = m.produto || 'Produto'; prodQtd[p] = (prodQtd[p] || 0) + 1; });
     const topProdutos = Object.entries(prodQtd).sort((a,b) => b[1] - a[1]).slice(0,4).map(([nome, qtd]) => ({ nome, qtd }));
 
-    // Top vendedores
     const vendQtd = {}, vendValor = {};
     movAtual.forEach(m => {
         const v = m.vendedor || 'Sem nome';
@@ -538,17 +544,14 @@ async function carregarDashboard(periodo) {
     const topVendedores = Object.entries(vendValor).sort((a,b) => b[1] - a[1]).slice(0,4).map(([nome, valor]) => ({ nome, valor, qtd: vendQtd[nome] }));
     const maxVendedor = topVendedores[0]?.valor || 1;
 
-    // Categorias
     const catValor = {};
     movAtual.forEach(m => { const c = m.categoria || 'Outros'; catValor[c] = (catValor[c] || 0) + parseFloat(m.valor); });
-
-    const sparkline = valoresAtual.slice(-7);
 
     const dados = {
         totalVendas, qtdVendas, ticket, totalComissoes,
         varVendas, varQtd, varTicket, varComissao,
         labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior,
-        topProdutos, topVendedores, maxVendedor, catValor, sparkline
+        topProdutos, topVendedores, maxVendedor, catValor
     };
 
     if (DISPOSITIVO === 'pc') await renderizarDashboardPC(dados);
@@ -556,218 +559,7 @@ async function carregarDashboard(periodo) {
 }
 
 // ==========================================
-// 10. DASHBOARD PC
-// ==========================================
-async function renderizarDashboardPC(dados) {
-    const { totalVendas, qtdVendas, ticket, totalComissoes, varVendas, varQtd, varTicket, varComissao, labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior, topProdutos, topVendedores, maxVendedor, catValor, sparkline } = dados;
-
-    const periodos = [
-        { id: 'hoje', label: 'Hoje' },
-        { id: '7dias', label: '7 dias' },
-        { id: 'mes', label: 'Este mês' },
-        { id: 'mesPassado', label: 'Mês passado' }
-    ];
-    const filtrosHtml = periodos.map(p => 
-        `<button class="filtro-periodo-btn ${!mesEspecificoAtivo && p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
-    ).join('');
-
-    const categoriasHTML = Object.keys(catValor).length > 0 
-        ? `<div class="pc-analise-card">
-            <div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div>
-            <div style="position:relative; flex:1; min-height:0;"><canvas id="grafico-categorias"></canvas></div>
-        </div>`
-        : `<div class="pc-analise-card"><div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div><p class="pc-vazio">Sem dados no período</p></div>`;
-
-    document.getElementById('app-container').innerHTML = `
-        <div class="pc-dashboard">
-            <div class="pc-dashboard-header">
-                <div>
-                    <h1 class="pc-titulo">Dashboard</h1>
-                    <p class="pc-subtitulo">Visão geral · ${labelAtual}</p>
-                </div>
-            </div>
-
-            <div class="dashboard-filtros-wrapper">
-                <div class="dashboard-filtros">${filtrosHtml}</div>
-                <button class="btn-filtro-extra ${mesEspecificoAtivo ? 'ativo' : ''}" onclick="abrirSeletorMes()">
-                    📅 ${mesEspecificoAtivo ? mesEspecificoAtivo.label : 'Mês específico'}
-                </button>
-                ${mesEspecificoAtivo ? `<button class="btn-filtro-extra" onclick="mesEspecificoAtivo=null; carregarDashboard(periodoDashboardSelecionado);">✕ Limpar</button>` : ''}
-            </div>
-
-            <div class="pc-kpis">
-                <div class="pc-kpi pc-kpi-destaque">
-                    <span class="kpi-label">VENDAS · ${labelAtual.toUpperCase()}</span>
-                    <strong class="kpi-valor">${formatarMoeda(totalVendas)}</strong>
-                    ${badgeVariacao(varVendas, labelAnterior)}
-                    <div class="kpi-sparkline">${gerarSparkline(sparkline)}</div>
-                </div>
-                <div class="pc-kpi">
-                    <span class="kpi-label">TICKET MÉDIO</span>
-                    <strong class="kpi-valor-branco">${formatarMoeda(ticket)}</strong>
-                    ${badgeVariacao(varTicket, labelAnterior)}
-                </div>
-                <div class="pc-kpi">
-                    <span class="kpi-label">Nº DE VENDAS</span>
-                    <strong class="kpi-valor-branco">${qtdVendas}</strong>
-                    ${badgeVariacao(varQtd, labelAnterior)}
-                </div>
-                <div class="pc-kpi">
-                    <span class="kpi-label">COMISSÕES</span>
-                    <strong class="kpi-valor">${formatarMoeda(totalComissoes)}</strong>
-                    ${badgeVariacao(varComissao, labelAnterior)}
-                </div>
-            </div>
-
-            <div class="pc-linha-graficos">
-                <div class="pc-card-grafico-grande">
-                    <div class="pc-card-header"><span class="pc-card-titulo">VENDAS · ${labelAtual.toUpperCase()}</span></div>
-                    <div class="grafico-legenda">
-                        <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
-                        <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
-                    </div>
-                    <div class="pc-canvas-grande"><canvas id="grafico-pc-semana"></canvas></div>
-                </div>
-                <div class="pc-card-grafico-pequeno">
-                    <div class="pc-card-header"><span class="pc-card-titulo">TOP PRODUTOS</span></div>
-                    <div class="pc-lista-top">
-                        ${topProdutos.length > 0 ? topProdutos.map((p, i) => `
-                            <div class="pc-top-item">
-                                <span class="pc-top-rank">${i+1}</span>
-                                <span class="pc-top-nome">${p.nome}</span>
-                                <span class="pc-top-qtd">${p.qtd}</span>
-                            </div>
-                        `).join('') : '<p class="pc-vazio">Nenhuma venda no período</p>'}
-                    </div>
-                </div>
-            </div>
-
-            <div class="pc-analise-row">
-                <div class="pc-analise-card">
-                    <div class="pc-card-header"><span class="pc-card-titulo">TOP VENDEDORES</span></div>
-                    <div class="pc-lista-top">
-                        ${topVendedores.length > 0 ? topVendedores.map(v => {
-                            const pct = (v.valor / maxVendedor) * 100;
-                            return `
-                            <div class="pc-vendedor-item">
-                                <div style="display:flex; align-items:center; gap:0.6rem;">
-                                    <div class="pc-vendedor-avatar">${v.nome.charAt(0).toUpperCase()}</div>
-                                    <div class="pc-vendedor-info">
-                                        <div class="pc-vendedor-nome">${v.nome}</div>
-                                        <div class="pc-vendedor-detalhe">${v.qtd} venda${v.qtd !== 1 ? 's' : ''}</div>
-                                    </div>
-                                    <div class="pc-vendedor-valor">${formatarMoeda(v.valor)}</div>
-                                </div>
-                                <div class="pc-vendedor-barra"><div class="pc-vendedor-barra-fill" style="width:${pct}%"></div></div>
-                            </div>`;
-                        }).join('') : '<p class="pc-vazio">Nenhuma venda no período</p>'}
-                    </div>
-                </div>
-                ${categoriasHTML}
-            </div>
-
-            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda-pc">🛒 NOVA VENDA</button>
-        </div>`;
-
-    // Painel direito com atividade recente
-    const painelDir = document.getElementById('pc-painel-direito');
-    if (painelDir) {
-        const { data: ultimasVendas } = await supabaseClient.from('movimentos')
-            .select('produto, valor, criado_em, vendedor')
-            .eq('tipo', 'venda').eq('cancelado', false)
-            .order('criado_em', { ascending: false }).limit(8);
-        painelDir.innerHTML = `
-            <div class="pc-painel-header">
-                <span class="pc-painel-titulo">ATIVIDADE RECENTE</span>
-                <span class="pc-painel-contador">${(ultimasVendas || []).length}</span>
-            </div>
-            <div class="pc-painel-lista">
-                ${(ultimasVendas && ultimasVendas.length > 0) ? ultimasVendas.map(v => `
-                    <div class="pc-atividade-item">
-                        <span class="pc-atividade-icone">🛒</span>
-                        <div class="pc-atividade-info">
-                            <span class="pc-atividade-produto">${v.produto || 'Produto'}</span>
-                            <span class="pc-atividade-hora">${new Date(v.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})} · ${v.vendedor || 'Sem nome'}</span>
-                        </div>
-                        <span class="pc-atividade-valor">${formatarMoeda(v.valor)}</span>
-                    </div>
-                `).join('') : '<p class="pc-vazio">Sem vendas registradas</p>'}
-            </div>
-        `;
-        painelDir.classList.add('ativo');
-    }
-
-    setTimeout(() => {
-        desenharGraficoDashboard('grafico-pc-semana', labels, valoresAtual, valoresAnterior, labelAnterior);
-        if (Object.keys(catValor).length > 0) desenharGraficoCategorias(catValor);
-    }, 50);
-}
-
-// ==========================================
-// 11. DASHBOARD MOBILE
-// ==========================================
-function renderizarDashboardMobile(dados) {
-    const { totalVendas, qtdVendas, ticket, varVendas, labelAnterior, labelAtual, labels, valoresAtual, valoresAnterior } = dados;
-
-    const periodos = [
-        { id: 'hoje', label: 'Hoje' },
-        { id: '7dias', label: '7 dias' },
-        { id: 'mes', label: 'Este mês' },
-        { id: 'mesPassado', label: 'Mês passado' }
-    ];
-    const filtrosHtml = periodos.map(p => 
-        `<button class="filtro-periodo-btn ${!mesEspecificoAtivo && p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
-    ).join('');
-
-    document.getElementById('app-container').innerHTML = `
-        <div class="tela-menu">
-            <div class="dashboard-filtros-wrapper">
-                <div class="dashboard-filtros">${filtrosHtml}</div>
-                <button class="btn-filtro-extra ${mesEspecificoAtivo ? 'ativo' : ''}" onclick="abrirSeletorMes()">
-                    📅 ${mesEspecificoAtivo ? mesEspecificoAtivo.label : 'Mês específico'}
-                </button>
-            </div>
-
-            <div class="card-resumo card-destaque">
-                <span>VENDAS · ${labelAtual.toUpperCase()}</span>
-                <strong>${formatarMoeda(totalVendas)}</strong>
-                ${badgeVariacao(varVendas, labelAnterior)}
-                <div class="metricas-mini">
-                    <span>${qtdVendas} venda${qtdVendas !== 1 ? 's' : ''}</span>
-                    <span>·</span>
-                    <span>Ticket ${formatarMoeda(ticket)}</span>
-                </div>
-            </div>
-
-            <div class="card-grafico">
-                <div class="card-grafico-header"><span class="card-grafico-titulo">Vendas · ${labelAtual}</span></div>
-                <div class="grafico-legenda">
-                    <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
-                    <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
-                </div>
-                <div class="card-grafico-canvas"><canvas id="grafico-semana"></canvas></div>
-            </div>
-
-            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda">NOVA VENDA 🛒</button>
-
-            <div class="grid-botoes-3">
-                <button onclick="renderizarTelaSangria()" class="btn-neutro"><span class="icone-btn">📤</span><span>Sangria</span></button>
-                <button onclick="renderizarTelaSuprimento()" class="btn-neutro"><span class="icone-btn">📥</span><span>Suprimento</span></button>
-                <button onclick="renderizarHistorico()" class="btn-neutro"><span class="icone-btn">📋</span><span>Histórico</span></button>
-                <button onclick="renderizarRelatorioComissoes()" class="btn-neutro"><span class="icone-btn">💰</span><span>Comissões</span></button>
-                <button onclick="renderizarTelaVendedores()" class="btn-neutro"><span class="icone-btn">👥</span><span>Vendedores</span></button>
-                <button onclick="renderizarTelaProdutos()" class="btn-neutro"><span class="icone-btn">📦</span><span>Produtos</span></button>
-            </div>
-
-            <button onclick="renderizarTelaFecharCaixa()" class="btn-fechar-caixa">🔒 Fechar Caixa</button>
-
-            <div class="dica-atalhos"><strong>F2</strong> a <strong>F9</strong> para atalhos · <strong>Esc</strong> volta</div>
-        </div>`;
-    setTimeout(() => desenharGraficoDashboard('grafico-semana', labels, valoresAtual, valoresAnterior, labelAnterior), 50);
-}
-
-// ==========================================
-// 12. HELPERS DO DASHBOARD
+// 10. HELPERS DO DASHBOARD
 // ==========================================
 function badgeVariacao(valor, labelAnterior) {
     if (valor === null) return `<span class="kpi-variacao neutra">— sem base</span>`;
@@ -776,26 +568,6 @@ function badgeVariacao(valor, labelAnterior) {
         <span class="seta">${positivo ? '▲' : '▼'}</span> ${positivo ? '+' : ''}${valor.toFixed(1)}% 
         <span style="opacity:0.7; font-weight:500;">vs ${labelAnterior}</span>
     </span>`;
-}
-
-function gerarSparkline(valores) {
-    if (!valores || valores.length === 0) return '';
-    const max = Math.max(...valores, 1);
-    const w = 100, h = 40;
-    const stepX = w / Math.max(valores.length - 1, 1);
-    let pathFill = `M 0 ${h}`;
-    let pathLine = '';
-    valores.forEach((v, i) => {
-        const x = i * stepX;
-        const y = h - (v/max)*h;
-        pathFill += ` L ${x} ${y}`;
-        pathLine += (i === 0 ? `M` : ` L`) + ` ${x} ${y}`;
-    });
-    pathFill += ` L ${w} ${h} Z`;
-    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <path d="${pathFill}" fill="rgba(250,204,21,0.15)" stroke="none"/>
-        <path d="${pathLine}" stroke="#FACC15" stroke-width="2" fill="none"/>
-    </svg>`;
 }
 
 function desenharGraficoDashboard(canvasId, labels, valoresAtual, valoresAnterior, labelAnterior) {
@@ -878,7 +650,7 @@ async function abrirSeletorMes() {
         mesesSet.add(`${d.getFullYear()}-${d.getMonth()}`);
     });
     if (mesesSet.size === 0) {
-        abrirModal('Aviso', 'Nenhuma venda registrada ainda. Faça sua primeira venda para usar o filtro por mês.');
+        abrirModal('Aviso', 'Nenhuma venda registrada ainda.');
         return;
     }
     const opcoes = [
@@ -900,6 +672,214 @@ async function abrirSeletorMes() {
         }
         carregarDashboard(periodoDashboardSelecionado);
     });
+}
+
+// ==========================================
+// 11. DASHBOARD PC
+// ==========================================
+async function renderizarDashboardPC(dados) {
+    const { totalVendas, qtdVendas, ticket, totalComissoes, varVendas, varQtd, varTicket, varComissao, labelAtual, labelAnterior, labels, valoresAtual, valoresAnterior, topProdutos, topVendedores, maxVendedor, catValor } = dados;
+
+    const periodos = [
+        { id: 'hoje', label: 'Hoje' },
+        { id: '7dias', label: '7 dias' },
+        { id: 'mes', label: 'Este mês' },
+        { id: 'mesPassado', label: 'Mês passado' }
+    ];
+    const filtrosHtml = periodos.map(p => 
+        `<button class="filtro-periodo-btn ${!mesEspecificoAtivo && p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
+    ).join('');
+
+    const categoriasHTML = Object.keys(catValor).length > 0 
+        ? `<div class="pc-analise-card">
+            <div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div>
+            <div style="position:relative; flex:1; min-height:0;"><canvas id="grafico-categorias"></canvas></div>
+        </div>`
+        : `<div class="pc-analise-card"><div class="pc-card-header"><span class="pc-card-titulo">POR CATEGORIA</span></div><p class="pc-vazio">Sem dados no período</p></div>`;
+
+    document.getElementById('app-container').innerHTML = `
+        <div class="pc-dashboard">
+            <div class="pc-dashboard-header">
+                <div>
+                    <h1 class="pc-titulo">Dashboard</h1>
+                    <p class="pc-subtitulo">Visão geral · ${labelAtual}</p>
+                </div>
+            </div>
+
+            <div class="dashboard-filtros-wrapper">
+                <div class="dashboard-filtros">${filtrosHtml}</div>
+                <button class="btn-filtro-extra ${mesEspecificoAtivo ? 'ativo' : ''}" onclick="abrirSeletorMes()">
+                    📅 ${mesEspecificoAtivo ? mesEspecificoAtivo.label : 'Mês específico'}
+                </button>
+                ${mesEspecificoAtivo ? `<button class="btn-filtro-extra" onclick="mesEspecificoAtivo=null; carregarDashboard(periodoDashboardSelecionado);">✕ Limpar</button>` : ''}
+            </div>
+
+            <div class="pc-kpis">
+                <div class="pc-kpi pc-kpi-destaque">
+                    <span class="kpi-label">VENDAS · ${labelAtual.toUpperCase()}</span>
+                    <strong class="kpi-valor">${formatarMoeda(totalVendas)}</strong>
+                    ${badgeVariacao(varVendas, labelAnterior)}
+                </div>
+                <div class="pc-kpi">
+                    <span class="kpi-label">TICKET MÉDIO</span>
+                    <strong class="kpi-valor-branco">${formatarMoeda(ticket)}</strong>
+                    ${badgeVariacao(varTicket, labelAnterior)}
+                </div>
+                <div class="pc-kpi">
+                    <span class="kpi-label">Nº DE VENDAS</span>
+                    <strong class="kpi-valor-branco">${qtdVendas}</strong>
+                    ${badgeVariacao(varQtd, labelAnterior)}
+                </div>
+                <div class="pc-kpi">
+                    <span class="kpi-label">COMISSÕES</span>
+                    <strong class="kpi-valor">${formatarMoeda(totalComissoes)}</strong>
+                    ${badgeVariacao(varComissao, labelAnterior)}
+                </div>
+            </div>
+
+            <div class="pc-linha-graficos">
+                <div class="pc-card-grafico-grande">
+                    <div class="pc-card-header"><span class="pc-card-titulo">VENDAS · ${labelAtual.toUpperCase()}</span></div>
+                    <div class="grafico-legenda">
+                        <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
+                        <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
+                    </div>
+                    <div class="pc-canvas-grande"><canvas id="grafico-pc-semana"></canvas></div>
+                </div>
+                <div class="pc-card-grafico-pequeno">
+                    <div class="pc-card-header"><span class="pc-card-titulo">TOP PRODUTOS</span></div>
+                    <div class="pc-lista-top">
+                        ${topProdutos.length > 0 ? topProdutos.map((p, i) => `
+                            <div class="pc-top-item">
+                                <span class="pc-top-rank">${i+1}</span>
+                                <span class="pc-top-nome">${p.nome}</span>
+                                <span class="pc-top-qtd">${p.qtd}</span>
+                            </div>
+                        `).join('') : '<p class="pc-vazio">Nenhuma venda no período</p>'}
+                    </div>
+                </div>
+            </div>
+
+            <div class="pc-analise-row">
+                <div class="pc-analise-card">
+                    <div class="pc-card-header"><span class="pc-card-titulo">TOP VENDEDORES</span></div>
+                    <div class="pc-lista-top">
+                        ${topVendedores.length > 0 ? topVendedores.map(v => {
+                            const pct = (v.valor / maxVendedor) * 100;
+                            return `
+                            <div class="pc-vendedor-item">
+                                <div style="display:flex; align-items:center; gap:0.6rem;">
+                                    <div class="pc-vendedor-avatar">${v.nome.charAt(0).toUpperCase()}</div>
+                                    <div class="pc-vendedor-info">
+                                        <div class="pc-vendedor-nome">${v.nome}</div>
+                                        <div class="pc-vendedor-detalhe">${v.qtd} venda${v.qtd !== 1 ? 's' : ''}</div>
+                                    </div>
+                                    <div class="pc-vendedor-valor">${formatarMoeda(v.valor)}</div>
+                                </div>
+                                <div class="pc-vendedor-barra"><div class="pc-vendedor-barra-fill" style="width:${pct}%"></div></div>
+                            </div>`;
+                        }).join('') : '<p class="pc-vazio">Nenhuma venda no período</p>'}
+                    </div>
+                </div>
+                ${categoriasHTML}
+            </div>
+
+            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda-pc">🛒 NOVA VENDA</button>
+        </div>`;
+
+    const painelDir = document.getElementById('pc-painel-direito');
+    if (painelDir) {
+        const { data: ultimasVendas } = await supabaseClient.from('movimentos')
+            .select('produto, valor, criado_em, vendedor')
+            .eq('tipo', 'venda').eq('cancelado', false)
+            .order('criado_em', { ascending: false }).limit(8);
+        painelDir.innerHTML = `
+            <div class="pc-painel-header">
+                <span class="pc-painel-titulo">ATIVIDADE RECENTE</span>
+                <span class="pc-painel-contador">${(ultimasVendas || []).length}</span>
+            </div>
+            <div class="pc-painel-lista">
+                ${(ultimasVendas && ultimasVendas.length > 0) ? ultimasVendas.map(v => `
+                    <div class="pc-atividade-item">
+                        <span class="pc-atividade-icone">🛒</span>
+                        <div class="pc-atividade-info">
+                            <span class="pc-atividade-produto">${v.produto || 'Produto'}</span>
+                            <span class="pc-atividade-hora">${new Date(v.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})} · ${v.vendedor || 'Sem nome'}</span>
+                        </div>
+                        <span class="pc-atividade-valor">${formatarMoeda(v.valor)}</span>
+                    </div>
+                `).join('') : '<p class="pc-vazio">Sem vendas registradas</p>'}
+            </div>
+        `;
+        painelDir.classList.add('ativo');
+    }
+
+    setTimeout(() => {
+        desenharGraficoDashboard('grafico-pc-semana', labels, valoresAtual, valoresAnterior, labelAnterior);
+        if (Object.keys(catValor).length > 0) desenharGraficoCategorias(catValor);
+    }, 50);
+}
+
+// ==========================================
+// 12. DASHBOARD MOBILE
+// ==========================================
+function renderizarDashboardMobile(dados) {
+    const { totalVendas, qtdVendas, ticket, varVendas, labelAnterior, labelAtual, labels, valoresAtual, valoresAnterior } = dados;
+
+    const periodos = [
+        { id: 'hoje', label: 'Hoje' },
+        { id: '7dias', label: '7 dias' },
+        { id: 'mes', label: 'Este mês' },
+        { id: 'mesPassado', label: 'Mês passado' }
+    ];
+    const filtrosHtml = periodos.map(p => 
+        `<button class="filtro-periodo-btn ${!mesEspecificoAtivo && p.id === periodoDashboardSelecionado ? 'ativo' : ''}" onclick="alterarPeriodoDashboard('${p.id}')">${p.label}</button>`
+    ).join('');
+
+    document.getElementById('app-container').innerHTML = `
+        <div class="tela-menu">
+            <div class="dashboard-filtros-wrapper">
+                <div class="dashboard-filtros">${filtrosHtml}</div>
+                <button class="btn-filtro-extra ${mesEspecificoAtivo ? 'ativo' : ''}" onclick="abrirSeletorMes()">
+                    📅 ${mesEspecificoAtivo ? mesEspecificoAtivo.label : 'Mês específico'}
+                </button>
+            </div>
+
+            <div class="card-resumo card-destaque">
+                <span>VENDAS · ${labelAtual.toUpperCase()}</span>
+                <strong>${formatarMoeda(totalVendas)}</strong>
+                ${badgeVariacao(varVendas, labelAnterior)}
+                <div class="metricas-mini">
+                    <span>${qtdVendas} venda${qtdVendas !== 1 ? 's' : ''}</span>
+                    <span>·</span>
+                    <span>Ticket ${formatarMoeda(ticket)}</span>
+                </div>
+            </div>
+
+            <div class="card-grafico">
+                <div class="card-grafico-header"><span class="card-grafico-titulo">Vendas · ${labelAtual}</span></div>
+                <div class="grafico-legenda">
+                    <span class="grafico-legenda-item"><span class="grafico-legenda-cor atual"></span> Atual</span>
+                    <span class="grafico-legenda-item"><span class="grafico-legenda-cor anterior"></span> ${labelAnterior}</span>
+                </div>
+                <div class="card-grafico-canvas"><canvas id="grafico-semana"></canvas></div>
+            </div>
+
+            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda">NOVA VENDA 🛒</button>
+
+            <div class="grid-botoes-3">
+                <button onclick="renderizarTelaSangria()" class="btn-neutro"><span class="icone-btn">📤</span><span>Sangria</span></button>
+                <button onclick="renderizarTelaSuprimento()" class="btn-neutro"><span class="icone-btn">📥</span><span>Suprimento</span></button>
+                <button onclick="renderizarHistorico()" class="btn-neutro"><span class="icone-btn">📋</span><span>Histórico</span></button>
+                <button onclick="renderizarRelatorioComissoes()" class="btn-neutro"><span class="icone-btn">💰</span><span>Comissões</span></button>
+                <button onclick="renderizarTelaVendedores()" class="btn-neutro"><span class="icone-btn">👥</span><span>Vendedores</span></button>
+                <button onclick="renderizarTelaAparelhos()" class="btn-neutro"><span class="icone-btn">📱</span><span>Aparelhos</span></button>
+                <button onclick="renderizarTelaProdutos()" class="btn-neutro"><span class="icone-btn">📦</span><span>Produtos</span></button>
+            </div>
+
+            <button onclick="renderizarTelaFecharCaixa()" class="btn-fechar-caixa">🔒 Fechar Caixa</button>
+        </div>`;
+    setTimeout(() => desenharGraficoDashboard('grafico-semana', labels, valoresAtual, valoresAnterior, labelAnterior), 50);
 }
 
 // ==========================================
@@ -1347,12 +1327,13 @@ function selecionarProdutoCatalogo(nome) {
 }
 
 // ==========================================
-// 15. SANGRIA E SUPRIMENTO
+// 15. SANGRIA / SUPRIMENTO
 // ==========================================
 function renderizarTelaSangria() {
     menuAtivoId = '';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
@@ -1378,7 +1359,8 @@ async function registrarSangria() {
 function renderizarTelaSuprimento() {
     menuAtivoId = '';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
@@ -1408,7 +1390,8 @@ async function registrarSuprimento() {
 async function renderizarTelaVendedores() {
     menuAtivoId = 'vendedores';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
     const { data: vendedores, error } = await supabaseClient.from('vendedores').select('*').order('nome');
     if (error) { abrirModal('Erro', error.message); return; }
     let html = '';
@@ -1496,65 +1479,407 @@ async function reativarVendedor(id) {
 }
 
 // ==========================================
-// 17. PRODUTOS
+// 17. APARELHOS
 // ==========================================
+// ==========================================
+// APARELHOS
+// ==========================================
+let aparelhoFiltroMarca = 'Todas';
+let aparelhoBuscaTexto = '';
+let aparelhosCache = [];
+
+async function renderizarTelaAparelhos() {
+    menuAtivoId = 'aparelhos';
+    renderizarSidebar();
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
+
+    const { data: aparelhos, error } = await supabaseClient.from('aparelhos').select('*').order('marca').order('nome');
+    if (error) { abrirModal('Erro', error.message); return; }
+    aparelhosCache = aparelhos || [];
+
+    // Lista de marcas únicas (pra montar os chips)
+    const marcasUnicas = [...new Set(aparelhosCache.map(a => a.marca || 'Outros'))].sort();
+
+    // Reset filtros ao abrir
+    aparelhoFiltroMarca = 'Todas';
+    aparelhoBuscaTexto = '';
+
+    const chipsHtml = ['Todas', ...marcasUnicas].map(m => {
+        const ativo = m === 'Todas' ? 'ativo' : '';
+        return `<button type="button" class="chip-filtro ${ativo}" data-marca="${m}" onclick="filtrarAparelhoMarca('${m.replace(/'/g, "\\'")}')">${m}</button>`;
+    }).join('');
+
+    document.getElementById('app-container').innerHTML = `
+        <div class="tela">
+            <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
+            <h2>📱 Aparelhos</h2>
+            <p class="subtitulo">${aparelhosCache.length} aparelhos cadastrados</p>
+
+            <div class="busca-wrapper-listagem">
+                <input type="text" id="aparelho-busca" placeholder="🔎 Buscar aparelho..." 
+                       class="input-grande" autocomplete="off" 
+                       oninput="filtrarAparelhoBusca(this.value)">
+            </div>
+
+            <div class="chips-filtro-wrap" id="aparelho-chips">
+                ${chipsHtml}
+            </div>
+
+            <div id="aparelhos-lista" class="lista-movimentos"></div>
+
+            <button onclick="renderizarFormAparelho()" class="btn-primario btn-pill btn-full">➕ NOVO APARELHO</button>
+        </div>`;
+
+    renderizarListaAparelhosFiltrada();
+}
+
+function filtrarAparelhoMarca(marca) {
+    aparelhoFiltroMarca = marca;
+    document.querySelectorAll('#aparelho-chips .chip-filtro').forEach(c => {
+        c.classList.toggle('ativo', c.dataset.marca === marca);
+    });
+    renderizarListaAparelhosFiltrada();
+}
+
+function filtrarAparelhoBusca(texto) {
+    aparelhoBuscaTexto = (texto || '').trim().toLowerCase();
+    renderizarListaAparelhosFiltrada();
+}
+
+function renderizarListaAparelhosFiltrada() {
+    const container = document.getElementById('aparelhos-lista');
+    if (!container) return;
+
+    // Aplica filtros
+    let filtrados = aparelhosCache;
+    if (aparelhoFiltroMarca !== 'Todas') {
+        filtrados = filtrados.filter(a => (a.marca || 'Outros') === aparelhoFiltroMarca);
+    }
+    if (aparelhoBuscaTexto) {
+        filtrados = filtrados.filter(a => {
+            const nomeMatch = a.nome.toLowerCase().includes(aparelhoBuscaTexto);
+            const marcaMatch = (a.marca || '').toLowerCase().includes(aparelhoBuscaTexto);
+            return nomeMatch || marcaMatch;
+        });
+    }
+
+    if (filtrados.length === 0) {
+        container.innerHTML = `<p class="subtitulo" style="padding:1.5rem;">${aparelhoBuscaTexto ? 'Nenhum aparelho encontrado.' : 'Nenhum aparelho nessa marca.'}</p>`;
+        return;
+    }
+
+    // Agrupa por marca
+    const porMarca = {};
+    filtrados.forEach(a => {
+        const m = a.marca || 'Outros';
+        if (!porMarca[m]) porMarca[m] = [];
+        porMarca[m].push(a);
+    });
+
+    let html = '';
+    Object.keys(porMarca).sort().forEach(marca => {
+        const aparelhos = porMarca[marca];
+
+        // Título da marca com contador + botão colapsar
+        html += `<div class="categoria-header-clicavel" onclick="toggleMarca('${marca.replace(/'/g, "\\'")}')" data-marca="${marca}">
+            <span class="categoria-titulo-texto">📱 ${marca} <span class="cat-contador">${aparelhos.length}</span></span>
+            <span class="categoria-toggle" id="toggle-${marca.replace(/[^a-zA-Z0-9]/g, '')}">▾</span>
+        </div>`;
+
+        html += `<div class="categoria-grupo" id="grupo-${marca.replace(/[^a-zA-Z0-9]/g, '')}">`;
+
+        aparelhos.forEach(a => {
+            const inativo = !a.ativo ? 'inativo' : '';
+            const btnToggle = a.ativo
+                ? `<button onclick="confirmarDesativarAparelho('${a.id}', '${a.nome.replace(/'/g, "\\'")}')" class="btn-perigo btn-mini">Desativar</button>`
+                : `<button onclick="reativarAparelho('${a.id}')" class="btn-sucesso btn-mini">Reativar</button>`;
+            html += `
+                <div class="item-compacto ${inativo}">
+                    <div class="item-compacto-info">
+                        <span class="item-compacto-nome">📱 ${a.nome}${!a.ativo ? ' (inativo)' : ''}</span>
+                    </div>
+                    <div class="item-compacto-acoes">
+                        <button onclick="renderizarFormAparelho('${a.id}', '${a.nome.replace(/'/g, "\\'")}', '${(a.marca || '').replace(/'/g, "\\'")}', ${a.ativo})" class="btn-neutro btn-mini">✏️</button>
+                        ${btnToggle}
+                    </div>
+                </div>`;
+        });
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function toggleMarca(marca) {
+    const idSeguro = marca.replace(/[^a-zA-Z0-9]/g, '');
+    const grupo = document.getElementById('grupo-' + idSeguro);
+    const toggle = document.getElementById('toggle-' + idSeguro);
+    if (!grupo) return;
+    const fechado = grupo.style.display === 'none';
+    grupo.style.display = fechado ? 'block' : 'none';
+    if (toggle) toggle.textContent = fechado ? '▾' : '▸';
+}
+
+function renderizarFormAparelho(id = null, nome = '', marca = '', ativo = true) {
+    const titulo = id ? 'Editar Aparelho' : 'Novo Aparelho';
+    const marcas = ['Apple', 'Samsung', 'Motorola', 'Xiaomi', 'LG', 'Nokia', 'Realme', 'Asus', 'Outros'];
+    document.getElementById('app-container').innerHTML = `
+        <div class="tela">
+            <button class="btn-voltar" onclick="renderizarTelaAparelhos()">← Voltar</button>
+            <h2>${titulo}</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label>🏢 Marca</label>
+                    <div class="categorias-wrap" id="form-aparelho-marcas">
+                        ${marcas.map(m => `<button type="button" class="chip-categoria ${m === marca ? 'ativo' : ''}" data-marca="${m}" onclick="selecionarMarcaAparelho('${m}')">${m}</button>`).join('')}
+                    </div>
+                    <input type="hidden" id="aparelho-marca" value="${marca}">
+                </div>
+                <div class="form-group">
+                    <label>📱 Nome do Modelo *</label>
+                    <input type="text" id="aparelho-nome" class="input-grande" value="${nome}" placeholder="Ex: iPhone 11, Galaxy S24 Ultra" onkeydown="if(event.key==='Enter'){event.preventDefault(); salvarAparelho('${id || ''}');}">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <div class="opcoes-grid cols-2" id="aparelho-status-opcoes">
+                        <button type="button" class="btn-opcao ${ativo ? 'ativo' : ''}" data-st="true" onclick="selecionarStatusAparelho('true')"><span class="icone-op">✓</span><span>Ativo</span></button>
+                        <button type="button" class="btn-opcao ${!ativo ? 'ativo' : ''}" data-st="false" onclick="selecionarStatusAparelho('false')"><span class="icone-op">✕</span><span>Inativo</span></button>
+                    </div>
+                    <input type="hidden" id="aparelho-ativo" value="${ativo}">
+                </div>
+                <button onclick="salvarAparelho('${id || ''}')" class="btn-primario btn-pill">SALVAR</button>
+            </div>
+        </div>`;
+    setTimeout(() => document.getElementById('aparelho-nome').focus(), 100);
+}
+
+function selecionarMarcaAparelho(marca) {
+    document.querySelectorAll('#form-aparelho-marcas .chip-categoria').forEach(c => c.classList.toggle('ativo', c.dataset.marca === marca));
+    document.getElementById('aparelho-marca').value = marca;
+}
+
+function selecionarStatusAparelho(v) {
+    document.getElementById('aparelho-ativo').value = v;
+    document.querySelectorAll('#aparelho-status-opcoes .btn-opcao').forEach(b => b.classList.toggle('ativo', b.dataset.st === v));
+}
+
+async function salvarAparelho(id) {
+    const nome = document.getElementById('aparelho-nome').value.trim();
+    const marca = document.getElementById('aparelho-marca').value.trim();
+    const ativo = document.getElementById('aparelho-ativo').value === 'true';
+    if (!nome) { abrirModal('Atenção', 'Informe o nome do aparelho.'); return; }
+
+    let error;
+    const payload = { nome, marca: marca || null, ativo };
+    if (id) ({ error } = await supabaseClient.from('aparelhos').update(payload).eq('id', id));
+    else ({ error } = await supabaseClient.from('aparelhos').insert([payload]));
+
+    if (error) {
+        abrirModal('Erro', error.code === '23505' ? 'Já existe um aparelho com esse nome.' : 'Erro: ' + error.message);
+        return;
+    }
+    abrirModal('Sucesso', 'Aparelho salvo!');
+    await renderizarTelaAparelhos();
+}
+
+function confirmarDesativarAparelho(id, nome) {
+    abrirModal('Desativar Aparelho', `Desativar "${nome}"? Ele não aparecerá mais no cadastro de produtos.`, async () => {
+        const { error } = await supabaseClient.from('aparelhos').update({ ativo: false }).eq('id', id);
+        if (error) { abrirModal('Erro', error.message); return; }
+        abrirModal('Sucesso', 'Aparelho desativado!');
+        await renderizarTelaAparelhos();
+    });
+}
+
+async function reativarAparelho(id) {
+    const { error } = await supabaseClient.from('aparelhos').update({ ativo: true }).eq('id', id);
+    if (error) { abrirModal('Erro', error.message); return; }
+    abrirModal('Sucesso', 'Aparelho reativado!');
+    await renderizarTelaAparelhos();
+}
+
+async function abrirSeletorAparelhoForm() {
+    const { data: aparelhos } = await supabaseClient.from('aparelhos').select('*').eq('ativo', true).order('marca').order('nome');
+    if (!aparelhos || aparelhos.length === 0) {
+        abrirModal('Aviso', 'Nenhum aparelho cadastrado. Vá em "Aparelhos" no menu lateral para adicionar.');
+        return;
+    }
+    const atual = document.getElementById('prod-modelo').value || '';
+    const porMarca = {};
+    aparelhos.forEach(a => {
+        const m = a.marca || 'Outros';
+        if (!porMarca[m]) porMarca[m] = [];
+        porMarca[m].push(a.nome);
+    });
+    const opcoes = [
+        { valor: '', label: '— Nenhum —' },
+        ...Object.keys(porMarca).sort().flatMap(marca =>
+            porMarca[marca].map(nome => ({ valor: nome, label: `${nome}` }))
+        )
+    ];
+    abrirSeletor('Selecione o Aparelho', opcoes, atual, (valor) => {
+        document.getElementById('prod-modelo').value = valor;
+        const btn = document.getElementById('btn-prod-modelo');
+        btn.querySelector('.seletor-label').textContent = valor || '— Nenhum —';
+        btn.classList.toggle('vazio', !valor);
+    });
+}
+
+// ==========================================
+// 18. PRODUTOS
+// ==========================================
+// ==========================================
+// PRODUTOS
+// ==========================================
+let produtoFiltroCategoria = 'Todas';
+let produtoBuscaTexto = '';
+let produtosCacheFull = [];
+
 async function renderizarTelaProdutos() {
     menuAtivoId = 'produtos';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
+
     const { data: produtos, error } = await supabaseClient.from('produtos').select('*').order('categoria').order('nome');
     if (error) { abrirModal('Erro', 'Erro: ' + error.message); return; }
-    let html = '';
-    if (!produtos || produtos.length === 0) {
-        html = '<p class="subtitulo">Nenhum produto cadastrado ainda.</p>';
-    } else {
-        const porCategoria = {};
-        produtos.forEach(p => {
-            const cat = p.categoria || 'Outros';
-            if (!porCategoria[cat]) porCategoria[cat] = [];
-            porCategoria[cat].push(p);
-        });
-        Object.keys(porCategoria).sort().forEach(cat => {
-            const catInfo = CATEGORIAS.find(c => c.id === cat) || { icone: '📦', nome: cat };
-            html += `<div class="categoria-titulo">${catInfo.icone} ${cat} <span class="cat-contador">${porCategoria[cat].length}</span></div>`;
-            porCategoria[cat].forEach(p => {
-                const inativo = !p.ativo ? 'inativo' : '';
-                const btnToggle = p.ativo
-                    ? `<button onclick="confirmarDesativarProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}')" class="btn-perigo btn-mini">Desativar</button>`
-                    : `<button onclick="reativarProduto('${p.id}')" class="btn-sucesso btn-mini">Reativar</button>`;
-                const modeloTag = p.modelo ? `<span class="tag-modelo">${p.modelo}</span>` : '';
-                html += `
-                    <div class="item-movimento ${inativo}">
-                        <div class="info">
-                            <div class="titulo">📦 ${p.nome} ${!p.ativo ? '(Inativo)' : ''}</div>
-                            <div class="detalhe">${modeloTag} Preço: <strong style="color:var(--accent);">${formatarMoeda(p.preco)}</strong></div>
-                        </div>
-                        <div style="display:flex; flex-direction:column; gap:0.3rem;">
-                            <button onclick="renderizarFormProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}', ${p.preco}, ${p.ativo}, '${(p.categoria || '').replace(/'/g, "\\'")}', '${(p.modelo || '').replace(/'/g, "\\'")}')" class="btn-neutro btn-mini">✏️ Editar</button>
-                            ${btnToggle}
-                        </div>
-                    </div>`;
-            });
-        });
-    }
+    produtosCacheFull = produtos || [];
+
+    // Categorias únicas presentes
+    const catsUnicas = [...new Set(produtosCacheFull.map(p => p.categoria || 'Outros'))].sort();
+
+    produtoFiltroCategoria = 'Todas';
+    produtoBuscaTexto = '';
+
+    const chipsHtml = ['Todas', ...catsUnicas].map(c => {
+        const catInfo = CATEGORIAS.find(x => x.id === c);
+        const icone = c === 'Todas' ? '📋' : (catInfo?.icone || '📦');
+        const ativo = c === 'Todas' ? 'ativo' : '';
+        return `<button type="button" class="chip-filtro ${ativo}" data-cat="${c}" onclick="filtrarProdutoCategoria('${c.replace(/'/g, "\\'")}')">${icone} ${c}</button>`;
+    }).join('');
+
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarMenuPrincipal()">← Voltar</button>
             <h2>📦 Produtos</h2>
-            <p class="subtitulo">Cada produto tem categoria e modelo</p>
-            <div class="lista-movimentos">${html}</div>
+            <p class="subtitulo">${produtosCacheFull.length} produtos cadastrados</p>
+
+            <div class="busca-wrapper-listagem">
+                <input type="text" id="produto-busca" placeholder="🔎 Buscar produto..." 
+                       class="input-grande" autocomplete="off" 
+                       oninput="filtrarProdutoBusca(this.value)">
+            </div>
+
+            <div class="chips-filtro-wrap" id="produto-chips">
+                ${chipsHtml}
+            </div>
+
+            <div id="produtos-lista" class="lista-movimentos"></div>
+
             <button onclick="renderizarFormProduto()" class="btn-primario btn-pill btn-full">➕ NOVO PRODUTO</button>
         </div>`;
+
+    renderizarListaProdutosFiltrada();
 }
+
+function filtrarProdutoCategoria(cat) {
+    produtoFiltroCategoria = cat;
+    document.querySelectorAll('#produto-chips .chip-filtro').forEach(c => {
+        c.classList.toggle('ativo', c.dataset.cat === cat);
+    });
+    renderizarListaProdutosFiltrada();
+}
+
+function filtrarProdutoBusca(texto) {
+    produtoBuscaTexto = (texto || '').trim().toLowerCase();
+    renderizarListaProdutosFiltrada();
+}
+
+function renderizarListaProdutosFiltrada() {
+    const container = document.getElementById('produtos-lista');
+    if (!container) return;
+
+    let filtrados = produtosCacheFull;
+    if (produtoFiltroCategoria !== 'Todas') {
+        filtrados = filtrados.filter(p => (p.categoria || 'Outros') === produtoFiltroCategoria);
+    }
+    if (produtoBuscaTexto) {
+        filtrados = filtrados.filter(p => {
+            const nomeMatch = p.nome.toLowerCase().includes(produtoBuscaTexto);
+            const modeloMatch = (p.modelo || '').toLowerCase().includes(produtoBuscaTexto);
+            return nomeMatch || modeloMatch;
+        });
+    }
+
+    if (filtrados.length === 0) {
+        container.innerHTML = `<p class="subtitulo" style="padding:1.5rem;">${produtoBuscaTexto ? 'Nenhum produto encontrado.' : 'Nenhum produto nessa categoria.'}</p>`;
+        return;
+    }
+
+    // Agrupa por categoria
+    const porCategoria = {};
+    filtrados.forEach(p => {
+        const c = p.categoria || 'Outros';
+        if (!porCategoria[c]) porCategoria[c] = [];
+        porCategoria[c].push(p);
+    });
+
+    let html = '';
+    Object.keys(porCategoria).sort().forEach(cat => {
+        const catInfo = CATEGORIAS.find(x => x.id === cat) || { icone: '📦' };
+        const itens = porCategoria[cat];
+
+        html += `<div class="categoria-header-clicavel" onclick="toggleCategoria('${cat.replace(/'/g, "\\'")}')" data-cat="${cat}">
+            <span class="categoria-titulo-texto">${catInfo.icone} ${cat} <span class="cat-contador">${itens.length}</span></span>
+            <span class="categoria-toggle" id="toggle-cat-${cat.replace(/[^a-zA-Z0-9]/g, '')}">▾</span>
+        </div>`;
+
+        html += `<div class="categoria-grupo" id="grupo-cat-${cat.replace(/[^a-zA-Z0-9]/g, '')}">`;
+
+        itens.forEach(p => {
+            const inativo = !p.ativo ? 'inativo' : '';
+            const btnToggle = p.ativo
+                ? `<button onclick="confirmarDesativarProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}')" class="btn-perigo btn-mini">Desativar</button>`
+                : `<button onclick="reativarProduto('${p.id}')" class="btn-sucesso btn-mini">Reativar</button>`;
+            const modeloTag = p.modelo ? `<span class="tag-modelo">${p.modelo}</span>` : '';
+            html += `
+                <div class="item-compacto ${inativo}">
+                    <div class="item-compacto-info">
+                        <span class="item-compacto-nome">📦 ${p.nome}${!p.ativo ? ' (inativo)' : ''}</span>
+                        <span class="item-compacto-meta">${modeloTag} <strong>${formatarMoeda(p.preco)}</strong></span>
+                    </div>
+                    <div class="item-compacto-acoes">
+                        <button onclick="renderizarFormProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}', ${p.preco}, ${p.ativo}, '${(p.categoria || '').replace(/'/g, "\\'")}', '${(p.modelo || '').replace(/'/g, "\\'")}')" class="btn-neutro btn-mini">✏️</button>
+                        ${btnToggle}
+                    </div>
+                </div>`;
+        });
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function toggleCategoria(cat) {
+    const idSeguro = cat.replace(/[^a-zA-Z0-9]/g, '');
+    const grupo = document.getElementById('grupo-cat-' + idSeguro);
+    const toggle = document.getElementById('toggle-cat-' + idSeguro);
+    if (!grupo) return;
+    const fechado = grupo.style.display === 'none';
+    grupo.style.display = fechado ? 'block' : 'none';
+    if (toggle) toggle.textContent = fechado ? '▾' : '▸';
+}
+
 function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, categoriaSel = '', modeloSel = '') {
     const titulo = id ? 'Editar Produto' : 'Novo Produto';
     const catsForm = CATEGORIAS.filter(c => c.id !== 'Todas');
     let chipsCats = catsForm.map(c =>
         `<button type="button" class="chip-categoria ${c.id === categoriaSel ? 'ativo' : ''}" data-cat="${c.id}" onclick="selecionarCategoriaFormProduto('${c.id}')">${c.icone} ${c.nome}</button>`
     ).join('');
-    let datalistModelos = '<datalist id="lista-modelos">';
-    listaModelos.forEach(m => { datalistModelos += `<option value="${m}">`; });
-    datalistModelos += '</datalist>';
+
     document.getElementById('app-container').innerHTML = `
         <div class="tela">
             <button class="btn-voltar" onclick="renderizarTelaProdutos()">← Voltar</button>
@@ -1567,8 +1892,11 @@ function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, ca
                 </div>
                 <div class="form-group">
                     <label>📱 Modelo do Aparelho (opcional)</label>
-                    <input type="text" id="prod-modelo" class="input-grande" placeholder="Ex: iPhone 11" value="${modeloSel}" list="lista-modelos" autocomplete="off">
-                    ${datalistModelos}
+                    <button type="button" class="btn-seletor ${modeloSel ? '' : 'vazio'}" id="btn-prod-modelo" onclick="abrirSeletorAparelhoForm()">
+                        <span class="seletor-label">${modeloSel || '— Nenhum —'}</span>
+                        <span class="seletor-seta">▼</span>
+                    </button>
+                    <input type="hidden" id="prod-modelo" value="${modeloSel}">
                 </div>
                 <div class="form-group">
                     <label>📦 Nome do Produto *</label>
@@ -1591,6 +1919,7 @@ function renderizarFormProduto(id = null, nome = '', preco = 0, ativo = true, ca
         </div>`;
     setTimeout(() => document.getElementById('prod-nome').focus(), 100);
 }
+
 function selecionarCategoriaFormProduto(catId) {
     document.querySelectorAll('#form-prod-categorias .chip-categoria').forEach(c => c.classList.toggle('ativo', c.dataset.cat === catId));
     document.getElementById('prod-categoria').value = catId;
@@ -1630,12 +1959,13 @@ async function reativarProduto(id) {
 }
 
 // ==========================================
-// 18. HISTÓRICO
+// 19. HISTÓRICO
 // ==========================================
 async function renderizarHistorico() {
     menuAtivoId = 'historico';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
     const { data: vendedores } = await supabaseClient.from('vendedores').select('nome').order('nome');
     vendedoresCache = (vendedores || []).map(v => ({ id: v.nome, nome: v.nome, comissao_percentual: 0 }));
     document.getElementById('app-container').innerHTML = `
@@ -1744,12 +2074,13 @@ function cancelarVenda(id) {
 }
 
 // ==========================================
-// 19. COMISSÕES
+// 20. COMISSÕES
 // ==========================================
 async function renderizarRelatorioComissoes() {
     menuAtivoId = 'comissoes';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
     const { data: vendedores } = await supabaseClient.from('vendedores').select('nome').order('nome');
     vendedoresCache = (vendedores || []).map(v => ({ id: v.nome, nome: v.nome, comissao_percentual: 0 }));
     document.getElementById('app-container').innerHTML = `
@@ -1797,6 +2128,7 @@ async function aplicarFiltroComissao(periodo, lerInputs = false) {
     await buscarComissoes(periodo);
 }
 async function buscarComissoes(periodo) {
+    periodoAtualComissao = periodo;
     let range;
     if (periodo === 'personalizado') {
         const di = document.getElementById('com-inicio').value, df = document.getElementById('com-fim').value;
@@ -1804,12 +2136,16 @@ async function buscarComissoes(periodo) {
         range = obterRangePeriodo('personalizado', di, df);
     } else range = obterRangePeriodo(periodo);
     const vendedorFiltro = document.getElementById('com-vendedor')?.value || '';
-    let query = supabaseClient.from('movimentos').select('vendedor, valor, comissao_valor, cancelado')
+    let query = supabaseClient.from('movimentos').select('*')
         .eq('tipo', 'venda').eq('cancelado', false)
-        .gte('criado_em', range.inicio).lte('criado_em', range.fim);
+        .gte('criado_em', range.inicio).lte('criado_em', range.fim)
+        .order('criado_em', { ascending: false });
     if (vendedorFiltro) query = query.eq('vendedor', vendedorFiltro);
     const { data: movimentos, error } = await query;
     if (error) { abrirModal('Erro', error.message); return; }
+
+    ultimosMovimentosComissao = movimentos || [];
+
     const resumo = {};
     (movimentos || []).forEach(m => {
         const v = m.vendedor || 'Não informado';
@@ -1828,9 +2164,9 @@ async function buscarComissoes(periodo) {
         entradas.forEach(([nome, dados]) => {
             tgv += dados.total; tgc += dados.comissao;
             html += `
-                <div class="item-movimento venda">
+                <div class="item-movimento venda" style="cursor:pointer;" onclick="abrirDetalheVendedor('${nome.replace(/'/g, "\\'")}')">
                     <div class="info">
-                        <div class="titulo">👤 ${nome}</div>
+                        <div class="titulo">👤 ${nome} <span style="font-size:0.7rem; color:var(--text-dim); font-weight:500;">ver detalhes →</span></div>
                         <div class="detalhe">${dados.qtd} item(ns) • Vendido: ${formatarMoeda(dados.total)}</div>
                     </div>
                     <div style="display:flex; flex-direction:column; align-items:flex-end;">
@@ -1846,12 +2182,109 @@ async function buscarComissoes(periodo) {
 }
 
 // ==========================================
-// 20. FECHAR CAIXA
+// 21. DETALHE DO VENDEDOR
+// ==========================================
+function abrirDetalheVendedor(nomeVendedor) {
+    const movs = ultimosMovimentosComissao.filter(m => (m.vendedor || 'Não informado') === nomeVendedor);
+    if (movs.length === 0) {
+        abrirModal('Aviso', 'Nenhuma venda encontrada para este vendedor.');
+        return;
+    }
+
+    const labelsPeriodo = {
+        'hoje': 'Hoje',
+        '7dias': 'Últimos 7 dias',
+        'mes': 'Este mês',
+        'mesPassado': 'Mês passado',
+        'personalizado': 'Personalizado'
+    };
+    const labelPeriodo = labelsPeriodo[periodoAtualComissao] || 'Hoje';
+
+    const porDia = {};
+    movs.forEach(m => {
+        const d = new Date(m.criado_em);
+        const key = d.toISOString().slice(0, 10);
+        if (!porDia[key]) porDia[key] = [];
+        porDia[key].push(m);
+    });
+
+    const diasOrdenados = Object.keys(porDia).sort().reverse();
+
+    let html = '';
+    let totalGeral = 0;
+    let totalComissao = 0;
+
+    diasOrdenados.forEach(diaKey => {
+        const itens = porDia[diaKey];
+        const totalDia = itens.reduce((acc, i) => acc + parseFloat(i.valor), 0);
+        totalGeral += totalDia;
+        totalComissao += itens.reduce((acc, i) => acc + parseFloat(i.comissao_valor || 0), 0);
+
+        const d = new Date(diaKey + 'T12:00:00');
+        const nomeDia = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+        const nomeDiaCap = nomeDia.charAt(0).toUpperCase() + nomeDia.slice(1);
+
+        html += `<div class="detalhe-dia">
+            <div class="detalhe-dia-header">
+                <span class="detalhe-dia-nome">${nomeDiaCap}</span>
+                <span class="detalhe-dia-total">${formatarMoeda(totalDia)}</span>
+            </div>`;
+
+        itens.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+        itens.forEach(item => {
+            const hora = new Date(item.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const pgto = (item.forma_pagamento === 'Crédito' && item.parcelas > 1)
+                ? `Crédito ${item.parcelas}x`
+                : item.forma_pagamento;
+            const canceladoClass = item.cancelado ? 'cancelado' : '';
+            const modeloTag = item.modelo ? `<span class="tag-modelo">${item.modelo}</span>` : '';
+
+            html += `<div class="detalhe-item ${canceladoClass}">
+                <div class="detalhe-item-info">
+                    <div class="detalhe-item-produto">${item.produto || 'Produto'}</div>
+                    <div class="detalhe-item-meta">
+                        <span>🕐 ${hora}</span>
+                        <span class="sep">•</span>
+                        <span>${pgto}</span>
+                        ${modeloTag ? `<span class="sep">•</span><span>${modeloTag}</span>` : ''}
+                    </div>
+                </div>
+                <div class="detalhe-item-valor">${formatarMoeda(item.valor)}</div>
+            </div>`;
+        });
+
+        html += `</div>`;
+    });
+
+    html += `<div class="detalhe-resumo-final">
+        <div class="card-resumo">
+            <span>Total Vendido</span>
+            <strong class="branco">${formatarMoeda(totalGeral)}</strong>
+        </div>
+        <div class="card-resumo card-destaque">
+            <span>Comissão</span>
+            <strong>${formatarMoeda(totalComissao)}</strong>
+        </div>
+    </div>`;
+
+    document.getElementById('detalhe-vendedor-titulo').textContent = `👤 ${nomeVendedor}`;
+    document.getElementById('detalhe-vendedor-periodo').textContent = `Período · ${labelPeriodo}`;
+    document.getElementById('detalhe-vendedor-lista').innerHTML = html;
+    document.getElementById('modal-detalhe-vendedor').classList.add('ativo');
+}
+
+function fecharDetalheVendedor() {
+    document.getElementById('modal-detalhe-vendedor').classList.remove('ativo');
+}
+
+// ==========================================
+// 22. FECHAR CAIXA
 // ==========================================
 async function renderizarTelaFecharCaixa() {
     menuAtivoId = '';
     renderizarSidebar();
-    document.getElementById('pc-painel-direito').classList.remove('ativo');
+    const painel = document.getElementById('pc-painel-direito');
+    if (painel) painel.classList.remove('ativo');
     const { data: movimentos } = await supabaseClient.from('movimentos').select('*')
         .eq('caixa_id', caixaAtual.id).eq('cancelado', false);
     let totDin = 0, totPix = 0, totDeb = 0, totCred = 0, totSan = 0, totSup = 0, totCom = 0;
@@ -1921,6 +2354,7 @@ async function renderizarTelaFecharCaixa() {
         });
     }, 50);
 }
+
 async function confirmarFechamento(dinheiroEsperado) {
     const valorContado = parseFloat(document.getElementById('fechamento-valor-contado').value);
     if (isNaN(valorContado)) { abrirModal('Atenção', 'Informe o valor contado.'); return; }
@@ -1934,7 +2368,8 @@ async function confirmarFechamento(dinheiroEsperado) {
         caixaAtual = null;
         atualizarSidebar(null);
         atualizarHeaderMobile(null);
-        document.getElementById('pc-painel-direito').classList.remove('ativo');
+        const painel = document.getElementById('pc-painel-direito');
+        if (painel) painel.classList.remove('ativo');
         abrirModal('Sucesso', 'Caixa fechado!');
         renderizarTelaAbrirCaixa();
     });

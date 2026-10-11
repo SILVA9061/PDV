@@ -1,7 +1,7 @@
 // ==========================================
-// SERVICE WORKER - BR TEST PDV - v33
+// SERVICE WORKER - BR TEST PDV - v39
 // ==========================================
-const CACHE_NAME = 'brtest-pdv-v33';
+const CACHE_NAME = 'brtest-pdv-v39';
 const ARQUIVOS_CACHE = [
     './',
     './index.html',
@@ -14,7 +14,7 @@ const ARQUIVOS_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-    console.log('🔧 SW v31 instalando...');
+    console.log('🔧 SW v39 instalando...');
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             return Promise.all(
@@ -27,7 +27,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-    console.log('✅ SW v31 ativado!');
+    console.log('✅ SW v39 ativado!');
     event.waitUntil(
         caches.keys().then((nomes) => Promise.all(
             nomes.map((nome) => {
