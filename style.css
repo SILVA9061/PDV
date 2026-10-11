@@ -2551,3 +2551,23 @@ canvas {
         gap: 0.4rem;
     }
 }
+/* ==========================================
+   CORREÇÃO: GLOW DOS BOTÕES SENDO CORTADO
+   ========================================== */
+@media (min-width: 1100px) {
+    .pc-dashboard {
+        padding-bottom: 2rem !important;
+        overflow: hidden !important;
+    }
+    
+    /* Botão nova venda: reduz o glow para não cortar */
+    .btn-nova-venda-pc {
+        margin-bottom: 0.5rem;
+        box-shadow: 0 4px 15px rgba(250, 204, 21, 0.35) !important;
+    }
+    
+    /* Se ainda cortar, ativa scroll vertical só quando necessário */
+    .pc-dashboard.tela-cheia {
+        overflow-y: auto !important;
+    }
+}
