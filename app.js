@@ -2510,3 +2510,9 @@ async function confirmarFechamento(dinheiroEsperado) {
         renderizarTelaAbrirCaixa();
     });
 }
+function avisarIOSEmBreve() {
+    abrirModal(
+        'Em Breve 🍏', 
+        'O aplicativo para iPhone e iPad está em desenvolvimento.\n\nPor enquanto, use o app no Windows ou Android.\n\nA versão iOS será lançada em breve!'
+    );
+}

@@ -2303,3 +2303,47 @@ canvas { display: block; max-width: 100% !important; width: 100% !important; hei
 .sidebar-menu-item.desabilitado:active {
     transform: none;
 }
+/* ==========================================
+   BOTÃO DE DOWNLOAD DESABILITADO (Em breve)
+   ========================================== */
+.btn-download-plataforma.desabilitado {
+    opacity: 0.5;
+    cursor: not-allowed;
+    position: relative;
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+.btn-download-plataforma.desabilitado:hover {
+    transform: none;
+    border-color: rgba(255, 255, 255, 0.15);
+    background: var(--bg-deep);
+}
+.btn-download-plataforma.desabilitado .plat-icone {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+}
+.btn-download-plataforma.desabilitado:hover .plat-icone {
+    transform: none;
+}
+.btn-download-plataforma.desabilitado .plat-nome {
+    color: var(--text-secondary);
+}
+.btn-download-plataforma.desabilitado .plat-desc {
+    color: var(--text-dim);
+}
+
+/* Selo "EM BREVE" */
+.plat-badge-breve {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    padding: 0.25rem 0.55rem;
+    border-radius: 100px;
+    background: rgba(250, 204, 21, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(250, 204, 21, 0.4);
+    text-transform: uppercase;
+}

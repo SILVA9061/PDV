@@ -1,227 +1,163 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="BR Test">
-    <meta name="theme-color" content="#0A0A0A">
-    <title>BR Test - PDV Premium</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzBBMEEwQSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjRkFDQzE1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjM1ZW0iPkJSPC90ZXh0Pjwvc3ZnPg==">
-
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0A0A0A">
+<title>BR Test PDV</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
 
-    <!-- ============================================
-         SIDEBAR PC (só aparece em telas ≥1100px)
-         ============================================ -->
-    <aside id="pc-sidebar" class="pc-sidebar">
+<div class="app-wrapper">
+    <!-- SIDEBAR PC -->
+    <aside class="pc-sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">BR <span>TEST</span></div>
-            <span id="sidebar-tag" class="sidebar-tag">FECHADO</span>
+            <span class="sidebar-tag fechado" id="sidebar-tag">FECHADO</span>
         </div>
 
         <div class="sidebar-operador">
             <div class="sidebar-avatar">👤</div>
             <div class="sidebar-operador-info">
-                <div id="sidebar-operador-nome" class="sidebar-operador-nome">—</div>
-                <div class="sidebar-operador-label">Operador</div>
+                <span class="sidebar-operador-nome" id="sidebar-operador-nome">—</span>
+                <span class="sidebar-operador-label">Operador</span>
             </div>
         </div>
 
-        <div id="sidebar-gaveta" class="sidebar-gaveta">
-            <span class="gaveta-icone">💰</span>
+        <div class="sidebar-gaveta" id="sidebar-gaveta">
+            <span class="gaveta-icone">💵</span>
             <div class="gaveta-info">
-                <div id="sidebar-gaveta-valor" class="gaveta-valor-header">R$ 0,00</div>
-                <div class="gaveta-label">na gaveta</div>
+                <span class="gaveta-valor-header" id="sidebar-gaveta-valor">R$ 0,00</span>
+                <span class="gaveta-label">Na gaveta</span>
             </div>
         </div>
 
-        <nav id="sidebar-menu" class="sidebar-menu"></nav>
+        <nav class="sidebar-menu" id="sidebar-menu"></nav>
 
         <div class="sidebar-rodape">
-            <div id="sidebar-relogio" class="sidebar-relogio">--:--:--</div>
-            <button class="sidebar-btn-download" onclick="abrirModalDownloads()" title="Baixar o App">
-                ⬇ Baixar o App
-            </button>
-            <button id="sidebar-btn-fechar" class="sidebar-btn-fechar" onclick="renderizarTelaFecharCaixa()" disabled>
-                🔒 Fechar Caixa
-            </button>
+            <div class="sidebar-relogio" id="sidebar-relogio">--:--:--</div>
+            <button class="sidebar-btn-download" onclick="abrirModalDownloads()">📥 Baixar App</button>
+            <button class="sidebar-btn-fechar" id="sidebar-btn-fechar" onclick="renderizarTelaFecharCaixa()" disabled>🔒 Fechar Caixa</button>
         </div>
     </aside>
 
-    <!-- ============================================
-         WRAPPER PRINCIPAL
-         ============================================ -->
-    <div class="app-wrapper">
-
-        <!-- Header Mobile/Tablet (some no PC) -->
-        <header id="main-header" class="mobile-header">
+    <!-- ÁREA PRINCIPAL -->
+    <div class="app-main">
+        <!-- HEADER MOBILE -->
+        <header class="mobile-header" id="mobile-header">
             <div class="header-topo">
                 <div class="header-logo-wrap">
                     <h1>BR <span class="text-yellow">TEST</span></h1>
-                    <span id="header-tag" class="header-tag fechado">FECHADO</span>
+                    <span class="header-tag fechado" id="header-tag">FECHADO</span>
                 </div>
                 <div class="header-direita">
-                    <span id="relogio" class="relogio">--:--</span>
-                    <button class="btn-download-discreto" onclick="abrirModalDownloads()" title="Baixar o App">⬇</button>
+                    <span class="relogio" id="relogio">--:--</span>
+                    <button class="btn-download-discreto" onclick="abrirModalDownloads()">⬇</button>
                 </div>
             </div>
             <div class="header-status">
-                <span id="header-operador" class="header-operador">—</span>
-                <span id="header-gaveta" class="gaveta-chip">
-                    💰 <span id="header-gaveta-valor" class="valor">R$ 0,00</span> na gaveta
+                <span class="header-operador" id="header-operador">—</span>
+                <span class="gaveta-chip" id="header-gaveta" style="display:none;">
+                    💵 <span class="valor" id="header-gaveta-valor">R$ 0,00</span>
                 </span>
             </div>
         </header>
 
-        <!-- Área principal onde tudo é renderizado via JS -->
-        <main id="app-container" class="app-main"></main>
-
-        <!-- Painel direito PC (atividade recente / carrinho) -->
-        <aside id="pc-painel-direito" class="pc-painel-direito"></aside>
+        <div id="app-container" class="app-main"></div>
     </div>
+</div>
 
-    <!-- ============================================
-         MODAL DE AVISOS (genérico)
-         ============================================ -->
-    <div id="modal-overlay" class="modal-overlay">
-        <div class="modal-box">
-            <h3 id="modal-titulo">Aviso</h3>
-            <p id="modal-mensagem">Mensagem aqui</p>
-            <div class="modal-botoes">
-                <button id="modal-btn-cancelar" class="btn-neutro" onclick="fecharModal()">Cancelar</button>
-                <button id="modal-btn-confirmar" class="btn-primario" onclick="confirmarModal()">OK</button>
+<!-- MODAIS -->
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+        <h3 id="modal-titulo">Aviso</h3>
+        <p id="modal-mensagem">Mensagem aqui</p>
+        <div class="modal-botoes">
+            <button class="btn-neutro" id="modal-btn-cancelar" onclick="fecharModal()">Cancelar</button>
+            <button class="btn-primario" id="modal-btn-confirmar" onclick="confirmarModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-valor">
+    <div class="modal-box">
+        <h3 id="modal-valor-titulo">Informe o valor</h3>
+        <p class="modal-produto-nome" id="modal-valor-produto">Produto</p>
+        <input type="number" id="modal-valor-input" class="input-grande" step="0.01" placeholder="0,00">
+        <div class="modal-botoes">
+            <button class="btn-neutro" onclick="fecharModalValor()">Cancelar</button>
+            <button class="btn-primario" onclick="confirmarValorProduto()">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-seletor">
+    <div class="modal-box">
+        <h3 id="seletor-titulo">Escolha</h3>
+        <div id="seletor-opcoes" class="seletor-opcoes"></div>
+        <div class="modal-botoes">
+            <button class="btn-neutro" onclick="fecharSeletor()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-downloads">
+    <div class="modal-box">
+        <h3>📥 Baixar o App</h3>
+        <p class="modal-subtitulo">Escolha a versão para o seu dispositivo</p>
+        <a id="link-download-windows" class="btn-download-plataforma" href="#">
+            <div class="plat-icone plat-windows">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5L10.5 4.4v7.1H3V5.5zm0 13l7.5 1.1v-7H3v5.9zm9-14.4L21 3v8.5h-9V4.1zm0 15.6L21 21v-8.5h-9v7.6z"/></svg>
             </div>
-        </div>
-    </div>
-
-    <!-- ============================================
-         MODAL DE VALOR (produto sem preço cadastrado)
-         ============================================ -->
-    <div id="modal-valor" class="modal-overlay">
-        <div class="modal-box">
-            <h3 id="modal-valor-titulo">Informe o valor</h3>
-            <p id="modal-valor-produto" class="modal-produto-nome">Produto</p>
-            <input type="number" id="modal-valor-input" class="input-grande" placeholder="0,00" step="0.01" inputmode="decimal">
-            <div class="modal-botoes">
-                <button class="btn-neutro" onclick="fecharModalValor()">Cancelar</button>
-                <button class="btn-primario" onclick="confirmarValorProduto()">Adicionar</button>
+            <div>
+                <div class="plat-nome">Windows</div>
+                <div class="plat-desc">Instalador .exe</div>
             </div>
+        </a>
+        <a id="link-download-android" class="btn-download-plataforma" href="#">
+            <div class="plat-icone plat-android">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.5 11.5 0 0 0-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48C3.3 11.25 1.28 14.44 1 18h22c-.28-3.56-2.3-6.75-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+            </div>
+            <div>
+                <div class="plat-nome">Android</div>
+                <div class="plat-desc">Arquivo .apk</div>
+            </div>
+        </a>
+        <button class="btn-download-plataforma desabilitado" onclick="avisarIOSEmBreve()">
+            <span class="plat-badge-breve">EM BREVE</span>
+            <div class="plat-icone plat-ios">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+            </div>
+            <div>
+                <div class="plat-nome">iOS</div>
+                <div class="plat-desc">iPhone / iPad</div>
+            </div>
+        </button>
+        <div class="modal-botoes">
+            <button class="btn-neutro" onclick="fecharModalDownloads()">Fechar</button>
         </div>
     </div>
+</div>
 
-    <!-- ============================================
-         MODAL SELETOR GENÉRICO
-         ============================================ -->
-    <div id="modal-seletor" class="modal-overlay">
-        <div class="modal-box modal-seletor-box">
-            <h3 id="seletor-titulo">Selecione</h3>
-            <div id="seletor-opcoes" class="seletor-opcoes"></div>
-            <button onclick="fecharSeletor()" class="btn-neutro btn-full">Cancelar</button>
-        </div>
+<div class="modal-catalogo" id="modal-catalogo">
+    <div class="catalogo-header">
+        <h3>📚 Catálogo</h3>
+        <button class="btn-fechar-catalogo" onclick="fecharCatalogo()">✕</button>
     </div>
-
-    <!-- ============================================
-         MODAL DE CATÁLOGO (tela cheia)
-         ============================================ -->
-    <div id="modal-catalogo" class="modal-catalogo">
-        <div class="catalogo-header">
-            <h3>📦 Catálogo</h3>
-            <button class="btn-fechar-catalogo" onclick="fecharCatalogo()">✕</button>
-        </div>
-        <div class="catalogo-busca-wrapper">
-            <input type="text" id="catalogo-busca" placeholder="🔎 Buscar produto..." class="input-grande" autocomplete="off" oninput="filtrarCatalogo(this.value)">
-        </div>
-        <div id="catalogo-tabs" class="catalogo-tabs-wrapper"></div>
-        <div class="catalogo-lista" id="catalogo-lista"></div>
+    <div class="catalogo-busca-wrapper">
+        <input type="text" class="input-grande" id="catalogo-busca" placeholder="🔍 Buscar produto...">
     </div>
+    <div class="catalogo-tabs-wrapper" id="catalogo-tabs"></div>
+    <div class="catalogo-lista" id="catalogo-lista"></div>
+</div>
 
-    <!-- ============================================
-         MODAL DE DETALHE DO VENDEDOR
-         ============================================ -->
-    <div id="modal-detalhe-vendedor" class="modal-catalogo">
-        <div class="catalogo-header">
-            <h3 id="detalhe-vendedor-titulo">Detalhe do Vendedor</h3>
-            <button class="btn-fechar-catalogo" onclick="fecharDetalheVendedor()">✕</button>
-        </div>
-        <div class="detalhe-vendedor-info">
-            <span id="detalhe-vendedor-periodo">—</span>
-        </div>
-        <div class="catalogo-lista" id="detalhe-vendedor-lista"></div>
-    </div>
+<div class="modal-overlay" id="modal-detalhe-vendedor">
+    <div class="modal-box" id="detalhe-vendedor-conteudo"></div>
+</div>
 
-    <!-- ============================================
-         MODAL DE DOWNLOADS
-         ============================================ -->
-    <div id="modal-downloads" class="modal-overlay">
-        <div class="modal-box">
-            <h3>⬇ Baixar o App</h3>
-            <p class="modal-subtitulo">Escolha a plataforma</p>
-            
-            <a id="link-download-windows" href="#" class="btn-download-plataforma" target="_blank">
-                <span class="plat-icone plat-windows">
-                    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M0 3.449L9.75 2.1v9.451H0V3.449zM0 20.55l9.75 1.35V12.45H0v8.1zM11.1 2.9L24 1.1v10.45H11.1V2.9zM11.1 12.45H24v10.45l-12.9-1.8V12.45z"/>
-                    </svg>
-                </span>
-                <div>
-                    <div class="plat-nome">Windows</div>
-                    <div class="plat-desc">Arquivo .exe</div>
-                </div>
-            </a>
-            
-            <a id="link-download-android" href="#" class="btn-download-plataforma" target="_blank">
-                <span class="plat-icone plat-android">
-                    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.523 15.3414c.5523 0 1-.4477 1-1 0-.5523-.4477-1-1-1-.5522 0-1 .4477-1 1 0 .5523.4478 1 1 1zM6.477 15.3414c.5523 0 1-.4477 1-1 0-.5523-.4477-1-1-1-.5523 0-1 .4477-1 1 0 .5523.4477 1 1 1zM7.6 3.193L6.29 1.019c-.106-.184-.042-.419.142-.525.184-.106.419-.042.525.142l1.33 2.205C9.617 2.393 10.773 2.146 12 2.146s2.383.247 3.713.695l1.33-2.205c.106-.184.341-.248.525-.142.184.106.248.341.142.525l-1.31 2.174C19.146 4.949 21 7.781 21 11.029v.146c0 .553-.448 1-1 1H4c-.552 0-1-.447-1-1v-.146c0-3.248 1.854-6.08 4.6-7.836zM4.5 20.13c0 1.028.833 1.861 1.861 1.861h.85v3.075c0 .624.506 1.13 1.13 1.13s1.13-.506 1.13-1.13V22h5.058v3.066c0 .624.506 1.13 1.13 1.13s1.13-.506 1.13-1.13V21.99h.85c1.028 0 1.861-.833 1.861-1.861v-7H4.5v7z"/>
-                    </svg>
-                </span>
-                <div>
-                    <div class="plat-nome">Android</div>
-                    <div class="plat-desc">Arquivo .apk</div>
-                </div>
-            </a>
-            
-            <a id="link-download-ios" href="#" class="btn-download-plataforma" target="_blank">
-                <span class="plat-icone plat-ios">
-                    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                    </svg>
-                </span>
-                <div>
-                    <div class="plat-nome">iPhone / iPad</div>
-                    <div class="plat-desc">Arquivo .ipa</div>
-                </div>
-            </a>
-            
-            <button onclick="fecharModalDownloads()" class="btn-neutro" style="margin-top: 0.5rem;">Fechar</button>
-        </div>
-    </div>
-
-    <!-- ============================================
-         SCRIPTS
-         ============================================ -->
-    <script src="app.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                    .then((reg) => { console.log('✅ SW:', reg.scope); reg.update(); })
-                    .catch((err) => console.error('❌ SW:', err));
-            });
-        }
-    </script>
+<script src="app.js"></script>
 </body>
 </html>
