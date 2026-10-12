@@ -1626,9 +1626,10 @@ canvas { display: block; max-width: 100% !important; width: 100% !important; hei
     /* ==========================================
        SIDEBAR PC (CORRIGIDA — menu com scroll interno)
        ========================================== */
-    .pc-sidebar {
-        display: flex;
-        flex-direction: column;
+        .pc-sidebar {
+        display: grid;
+        grid-template-rows: auto auto auto 1fr auto;
+        /* ↑ Linhas: header / operador / gaveta / menu (cresce) / rodapé */
         width: var(--sidebar-w);
         flex-shrink: 0;
         background: var(--bg-surface);
@@ -1638,6 +1639,7 @@ canvas { display: block; max-width: 100% !important; width: 100% !important; hei
         height: 100vh;
         max-height: 100vh;
         overflow: hidden;
+        box-sizing: border-box;
     }
     .sidebar-header {
         display: flex;
@@ -1710,11 +1712,10 @@ canvas { display: block; max-width: 100% !important; width: 100% !important; hei
     .gaveta-label { font-size: 0.6rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
 
     /* MENU — flex:1 + scroll interno (correção principal) */
-    .sidebar-menu {
+       .sidebar-menu {
         display: flex;
         flex-direction: column;
         gap: 0.2rem;
-        flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
