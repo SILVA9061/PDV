@@ -86,6 +86,12 @@ let periodoDashboardSelecionado = 'hoje';
 let mesEspecificoAtivo = null;
 let ultimosMovimentosComissao = [];
 let periodoAtualComissao = 'hoje';
+let aparelhoFiltroMarca = 'Todas';
+let aparelhoBuscaTexto = '';
+let aparelhosCache = [];
+let produtoFiltroCategoria = 'Todas';
+let produtoBuscaTexto = '';
+let produtosCacheFull = [];
 
 // ==========================================
 // 3. UTILITÁRIOS
@@ -129,6 +135,32 @@ function renderizarSidebar() {
             <span class="sidebar-menu-label">${item.label}</span>
         </button>
     `).join('');
+}function renderizarSidebar() {
+    const menuEl = document.getElementById('sidebar-menu');
+    if (!menuEl) return;
+    
+    // Se o caixa estiver FECHADO, todos os itens ficam desabilitados
+    const caixaAberto = !!caixaAtual;
+    
+    menuEl.innerHTML = MENU_ITENS.map(item => {
+        // Quando o caixa está fechado, o item fica bloqueado
+        const desabilitado = !caixaAberto;
+        const classeDesabilitado = desabilitado ? 'desabilitado' : '';
+        const acaoOnclick = desabilitado 
+            ? `onclick="avisarCaixaFechado()"` 
+            : `onclick="${item.acao}()"`;
+        
+        return `
+            <button class="sidebar-menu-item ${menuAtivoId === item.id ? 'ativo' : ''} ${classeDesabilitado}" ${acaoOnclick}>
+                <span class="sidebar-menu-icone">${item.icone}</span>
+                <span class="sidebar-menu-label">${item.label}</span>
+            </button>
+        `;
+    }).join('');
+}
+
+function avisarCaixaFechado() {
+    abrirModal('Caixa Fechado', 'Para usar o sistema, você precisa abrir o caixa primeiro.\n\nPreencha o operador e o valor inicial na tela principal e clique em "ABRIR CAIXA".');
 }
 
 function atualizarSidebar(caixa) {
@@ -208,8 +240,31 @@ function abrirModal(titulo, mensagem, callbackConfirmar = null) {
     }
     setTimeout(() => btnConfirmar.focus(), 100);
 }
-function fecharModal() { document.getElementById('modal-overlay').classList.remove('ativo'); acaoConfirmada = null; }
-function confirmarModal() { if (acaoConfirmada) acaoConfirmada(); fecharModal(); }
+
+function fecharModal() {
+    document.getElementById('modal-overlay').classList.remove('ativo');
+    acaoConfirmada = null;
+}
+
+function confirmarModal() {
+    if (acaoConfirmada) acaoConfirmada();
+    fecharModal();
+}
+
+function fecharModalEResetar() {
+    const modalBox = document.querySelector('#modal-overlay .modal-box');
+    modalBox.innerHTML = `
+        <h3 id="modal-titulo">Aviso</h3>
+        <p id="modal-mensagem">Mensagem aqui</p>
+        <div class="modal-botoes">
+            <button id="modal-btn-cancelar" class="btn-neutro" onclick="fecharModal()">Cancelar</button>
+            <button id="modal-btn-confirmar" class="btn-primario" onclick="confirmarModal()">OK</button>
+        </div>
+    `;
+    document.getElementById('modal-overlay').classList.remove('ativo');
+    acaoConfirmada = null;
+    renderizarMenuPrincipal();
+}
 
 function abrirModalValor(produtoNome) {
     valorProdutoPendente = produtoNome;
@@ -220,7 +275,12 @@ function abrirModalValor(produtoNome) {
     modalAbertoEm = Date.now();
     setTimeout(() => document.getElementById('modal-valor-input').focus(), 100);
 }
-function fecharModalValor() { document.getElementById('modal-valor').classList.remove('ativo'); valorProdutoPendente = null; }
+
+function fecharModalValor() {
+    document.getElementById('modal-valor').classList.remove('ativo');
+    valorProdutoPendente = null;
+}
+
 function confirmarValorProduto() {
     const valor = parseFloat(document.getElementById('modal-valor-input').value);
     if (!valor || valor <= 0) { abrirModal('Atenção', 'Informe um valor válido.'); return; }
@@ -239,8 +299,16 @@ function abrirSeletor(titulo, opcoes, valorAtual, callback) {
     document.getElementById('modal-seletor').classList.add('ativo');
     modalAbertoEm = Date.now();
 }
-function fecharSeletor() { document.getElementById('modal-seletor').classList.remove('ativo'); seletorCallback = null; }
-function escolherSeletor(valor) { if (seletorCallback) seletorCallback(valor); fecharSeletor(); }
+
+function fecharSeletor() {
+    document.getElementById('modal-seletor').classList.remove('ativo');
+    seletorCallback = null;
+}
+
+function escolherSeletor(valor) {
+    if (seletorCallback) seletorCallback(valor);
+    fecharSeletor();
+}
 
 function abrirModalDownloads() {
     document.getElementById('link-download-windows').href = URL_DOWNLOAD_WINDOWS;
@@ -249,7 +317,10 @@ function abrirModalDownloads() {
     document.getElementById('modal-downloads').classList.add('ativo');
     modalAbertoEm = Date.now();
 }
-function fecharModalDownloads() { document.getElementById('modal-downloads').classList.remove('ativo'); }
+
+function fecharModalDownloads() {
+    document.getElementById('modal-downloads').classList.remove('ativo');
+}
 
 function obterRangePeriodo(periodo, dataInicio = null, dataFim = null) {
     const agora = new Date();
@@ -783,8 +854,6 @@ async function renderizarDashboardPC(dados) {
                 </div>
                 ${categoriasHTML}
             </div>
-
-            <button onclick="renderizarTelaNovaVenda()" class="btn-primario btn-nova-venda-pc">🛒 NOVA VENDA</button>
         </div>`;
 
     const painelDir = document.getElementById('pc-painel-direito');
@@ -1081,7 +1150,7 @@ function renderizarListaBusca(itens, marcarSemPreco) {
     dropdown.innerHTML = itens.map((p, idx) => {
         const semPreco = marcarSemPreco && (!p.preco || p.preco === 0);
         const precoTxt = semPreco ? 'Definir valor' : formatarMoeda(p.preco);
-        const catTag = p.categoria && p.categoria !== 'Outros' ? `<span class="tag-cat">${p.categoria}</span>` : '';
+        const catTag = p.categoria && p.categoria !== 'Outros' ? `<span class="tag-cat" data-cat="${p.categoria}">${p.categoria}</span>` : '';
         return `<div class="busca-resultado-item ${semPreco ? 'sem-preco' : ''}" data-idx="${idx}" onclick="adicionarProdutoPorNome('${p.nome.replace(/'/g, "\\'")}')">
             <div class="nome">${p.nome} ${catTag}</div>
             <div class="preco">${precoTxt}</div>
@@ -1148,7 +1217,7 @@ function renderizarCarrinho() {
         return;
     }
     container.innerHTML = carrinho.map((item, idx) => `
-        <div class="item-carrinho">
+        <div class="item-carrinho" data-cat="${item.categoria || 'Outros'}">
             <span class="nome-item">${item.nome}</span>
             <input type="number" class="valor-input" value="${item.valor.toFixed(2)}"
                    step="0.01" inputmode="decimal"
@@ -1217,8 +1286,8 @@ function atualizarTotais() {
     const totalEl = document.getElementById('venda-total');
     if (totalEl) {
         totalEl.textContent = formatarMoeda(total);
-        totalEl.style.transform = 'scale(1.08)';
-        setTimeout(() => totalEl.style.transform = 'scale(1)', 150);
+        totalEl.classList.add('pulse');
+        setTimeout(() => totalEl.classList.remove('pulse'), 300);
     }
     atualizarComissao();
 }
@@ -1235,25 +1304,61 @@ function atualizarComissao() {
 async function registrarVenda() {
     if (!vendedorSelecionadoId) { abrirModal('Atenção', 'Selecione um vendedor.'); return; }
     if (carrinho.length === 0) { abrirModal('Atenção', 'Adicione pelo menos um produto.'); return; }
+
     const v = vendedoresCache.find(x => x.id === vendedorSelecionadoId);
     const comissaoPct = v ? parseFloat(v.comissao_percentual) : 0;
     const total = carrinho.reduce((acc, i) => acc + (i.valor || 0), 0);
     if (total <= 0) { abrirModal('Atenção', 'O total da venda está zerado.'); return; }
+
     const grupoVenda = (crypto.randomUUID ? crypto.randomUUID() : 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
     const itens = carrinho.map(item => ({
-        caixa_id: caixaAtual.id, tipo: 'venda', valor: item.valor, forma_pagamento: pagamentoSelecionado,
+        caixa_id: caixaAtual.id,
+        tipo: 'venda',
+        valor: item.valor,
+        forma_pagamento: pagamentoSelecionado,
         parcelas: pagamentoSelecionado === 'Crédito' ? parcelasSelecionadas : 1,
-        produto: item.nome, vendedor: vendedorSelecionadoNome, vendedor_id: vendedorSelecionadoId,
-        comissao_percentual: comissaoPct, comissao_valor: item.valor * (comissaoPct / 100),
-        grupo_venda: grupoVenda, categoria: item.categoria || null, modelo: item.modelo || null
+        produto: item.nome,
+        vendedor: vendedorSelecionadoNome,
+        vendedor_id: vendedorSelecionadoId,
+        comissao_percentual: comissaoPct,
+        comissao_valor: item.valor * (comissaoPct / 100),
+        grupo_venda: grupoVenda,
+        categoria: item.categoria || null,
+        modelo: item.modelo || null
     }));
+
     const { error } = await supabaseClient.from('movimentos').insert(itens);
     if (error) { abrirModal('Erro', 'Erro ao registrar: ' + error.message); return; }
+
     const comissaoTotal = total * (comissaoPct / 100);
-    const resumo = carrinho.map(i => `• ${i.nome}`).join('\n');
     const formaPgto = pagamentoSelecionado === 'Crédito' ? `Crédito ${parcelasSelecionadas}x` : pagamentoSelecionado;
-    abrirModal('Venda Registrada', `${carrinho.length} item(ns)\n${resumo}\n\nForma: ${formaPgto}\nTotal: ${formatarMoeda(total)}\nComissão: ${formatarMoeda(comissaoTotal)}`);
-    await renderizarMenuPrincipal();
+    const resumo = carrinho.map(i => `• ${i.nome}`).join('\n');
+
+    // MODAL DE SUCESSO ANIMADO
+    const modalBox = document.querySelector('#modal-overlay .modal-box');
+    modalBox.innerHTML = `
+        <div class="modal-sucesso-icone">✓</div>
+        <div class="modal-sucesso-titulo">Venda Registrada!</div>
+        <div class="modal-sucesso-desc">
+            ${carrinho.length} item(ns) · ${formaPgto}<br>
+            ${resumo.replace(/\n/g, '<br>')}
+        </div>
+        <div class="modal-sucesso-comissao">
+            <span class="label">Comissão</span>
+            <span class="valor">${formatarMoeda(comissaoTotal)}</span>
+        </div>
+        <div style="text-align:center; padding-top:0.3rem;">
+            <div style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1.2px; font-weight:700;">Total</div>
+            <div style="font-size:1.8rem; color:var(--accent); font-weight:800; letter-spacing:-1px; font-variant-numeric:tabular-nums;">${formatarMoeda(total)}</div>
+        </div>
+        <div class="modal-botoes" style="margin-top:0.5rem;">
+            <button onclick="fecharModalEResetar()" class="btn-primario" style="flex:1; padding:1rem; border-radius:14px; text-transform:uppercase; letter-spacing:1px;">OK</button>
+        </div>
+    `;
+    document.getElementById('modal-overlay').classList.add('ativo');
+    modalAbertoEm = Date.now();
+    acaoConfirmada = null;
 }
 
 // ==========================================
@@ -1301,10 +1406,10 @@ function renderizarCatalogo(termo) {
     container.innerHTML = filtrados.map(p => {
         const temPreco = p.preco && p.preco > 0;
         const precoTxt = temPreco ? formatarMoeda(p.preco) : 'Definir valor';
-        const catTag = p.categoria && p.categoria !== 'Outros' ? `<span class="tag-cat">${p.categoria}</span>` : '';
+        const catTag = p.categoria && p.categoria !== 'Outros' ? `<span class="tag-cat" data-cat="${p.categoria}">${p.categoria}</span>` : '';
         const modeloTag = p.modelo ? `<span class="tag-modelo">${p.modelo}</span>` : '';
         return `
-            <div class="item-catalogo" onclick="selecionarProdutoCatalogo('${p.nome.replace(/'/g, "\\'")}')">
+            <div class="item-catalogo" data-cat="${p.categoria || 'Outros'}" onclick="selecionarProdutoCatalogo('${p.nome.replace(/'/g, "\\'")}')">
                 <div class="info-produto">
                     <div class="nome-produto">${p.nome}</div>
                     <div>${catTag}${modeloTag}</div>
@@ -1411,6 +1516,7 @@ async function renderizarTelaVendedores() {
                     </div>
                     <div style="display:flex; flex-direction:column; gap:0.3rem;">
                         <button onclick="renderizarFormVendedor('${v.id}', '${v.nome.replace(/'/g, "\\'")}', ${v.comissao_percentual}, ${v.ativo})" class="btn-neutro btn-mini">✏️ Editar</button>
+                        <button onclick="confirmarExcluirVendedor('${v.id}', '${v.nome.replace(/'/g, "\\'")}')" class="btn-perigo btn-mini" title="Excluir definitivamente">🗑️ Excluir</button>
                         ${btnToggle}
                     </div>
                 </div>`;
@@ -1477,17 +1583,24 @@ async function reativarVendedor(id) {
     abrirModal('Sucesso', 'Vendedor reativado!');
     await renderizarTelaVendedores();
 }
+async function confirmarExcluirVendedor(id, nome) {
+    const { data: vendas } = await supabaseClient.from('movimentos').select('id').eq('vendedor', nome).limit(1);
+    const temVendas = (vendas || []).length > 0;
+    let mensagem = `Excluir "${nome}" permanentemente?\n\nEsta ação NÃO pode ser desfeita.`;
+    if (temVendas) {
+        mensagem = `⚠️ ATENÇÃO!\n\n"${nome}" já tem vendas registradas.\n\nSe excluir:\n• As vendas continuam contando no histórico\n• Mas o cadastro do vendedor é apagado\n\nDeseja continuar?`;
+    }
+    abrirModal('Excluir Vendedor', mensagem, async () => {
+        const { error } = await supabaseClient.from('vendedores').delete().eq('id', id);
+        if (error) { abrirModal('Erro', 'Não foi possível excluir: ' + error.message); return; }
+        abrirModal('Sucesso', `"${nome}" excluído!`);
+        await renderizarTelaVendedores();
+    });
+}
 
 // ==========================================
 // 17. APARELHOS
 // ==========================================
-// ==========================================
-// APARELHOS
-// ==========================================
-let aparelhoFiltroMarca = 'Todas';
-let aparelhoBuscaTexto = '';
-let aparelhosCache = [];
-
 async function renderizarTelaAparelhos() {
     menuAtivoId = 'aparelhos';
     renderizarSidebar();
@@ -1498,10 +1611,8 @@ async function renderizarTelaAparelhos() {
     if (error) { abrirModal('Erro', error.message); return; }
     aparelhosCache = aparelhos || [];
 
-    // Lista de marcas únicas (pra montar os chips)
     const marcasUnicas = [...new Set(aparelhosCache.map(a => a.marca || 'Outros'))].sort();
 
-    // Reset filtros ao abrir
     aparelhoFiltroMarca = 'Todas';
     aparelhoBuscaTexto = '';
 
@@ -1551,7 +1662,6 @@ function renderizarListaAparelhosFiltrada() {
     const container = document.getElementById('aparelhos-lista');
     if (!container) return;
 
-    // Aplica filtros
     let filtrados = aparelhosCache;
     if (aparelhoFiltroMarca !== 'Todas') {
         filtrados = filtrados.filter(a => (a.marca || 'Outros') === aparelhoFiltroMarca);
@@ -1569,7 +1679,6 @@ function renderizarListaAparelhosFiltrada() {
         return;
     }
 
-    // Agrupa por marca
     const porMarca = {};
     filtrados.forEach(a => {
         const m = a.marca || 'Outros';
@@ -1580,14 +1689,14 @@ function renderizarListaAparelhosFiltrada() {
     let html = '';
     Object.keys(porMarca).sort().forEach(marca => {
         const aparelhos = porMarca[marca];
+        const idSeguro = marca.replace(/[^a-zA-Z0-9]/g, '');
 
-        // Título da marca com contador + botão colapsar
         html += `<div class="categoria-header-clicavel" onclick="toggleMarca('${marca.replace(/'/g, "\\'")}')" data-marca="${marca}">
             <span class="categoria-titulo-texto">📱 ${marca} <span class="cat-contador">${aparelhos.length}</span></span>
-            <span class="categoria-toggle" id="toggle-${marca.replace(/[^a-zA-Z0-9]/g, '')}">▾</span>
+            <span class="categoria-toggle" id="toggle-${idSeguro}">▾</span>
         </div>`;
 
-        html += `<div class="categoria-grupo" id="grupo-${marca.replace(/[^a-zA-Z0-9]/g, '')}">`;
+        html += `<div class="categoria-grupo" id="grupo-${idSeguro}">`;
 
         aparelhos.forEach(a => {
             const inativo = !a.ativo ? 'inativo' : '';
@@ -1600,7 +1709,8 @@ function renderizarListaAparelhosFiltrada() {
                         <span class="item-compacto-nome">📱 ${a.nome}${!a.ativo ? ' (inativo)' : ''}</span>
                     </div>
                     <div class="item-compacto-acoes">
-                        <button onclick="renderizarFormAparelho('${a.id}', '${a.nome.replace(/'/g, "\\'")}', '${(a.marca || '').replace(/'/g, "\\'")}', ${a.ativo})" class="btn-neutro btn-mini">✏️</button>
+                        <button onclick="renderizarFormAparelho('${a.id}', '${a.nome.replace(/'/g, "\\'")}', '${(a.marca || '').replace(/'/g, "\\'")}', ${a.ativo})" class="btn-neutro btn-mini" title="Editar">✏️</button>
+                        <button onclick="confirmarExcluirAparelho('${a.id}', '${a.nome.replace(/'/g, "\\'")}')" class="btn-perigo btn-mini" title="Excluir definitivamente">🗑️</button>
                         ${btnToggle}
                     </div>
                 </div>`;
@@ -1700,6 +1810,24 @@ async function reativarAparelho(id) {
     await renderizarTelaAparelhos();
 }
 
+async function confirmarExcluirAparelho(id, nome) {
+    const { data: produtosUsando } = await supabaseClient.from('produtos').select('nome').eq('modelo', nome);
+    const qtdProdutos = (produtosUsando || []).length;
+    let mensagem = `Excluir "${nome}" permanentemente?\n\nEsta ação NÃO pode ser desfeita.`;
+    if (qtdProdutos > 0) {
+        mensagem = `⚠️ ATENÇÃO!\n\n"${nome}" está sendo usado em ${qtdProdutos} produto(s).\n\nSe excluir:\n• Os produtos perderão a referência do modelo\n• Vendas antigas mantêm o histórico\n\nDeseja continuar mesmo assim?`;
+    }
+    abrirModal('Excluir Aparelho', mensagem, async () => {
+        const { error } = await supabaseClient.from('aparelhos').delete().eq('id', id);
+        if (error) { abrirModal('Erro', 'Não foi possível excluir: ' + error.message); return; }
+        if (qtdProdutos > 0) {
+            await supabaseClient.from('produtos').update({ modelo: null }).eq('modelo', nome);
+        }
+        abrirModal('Sucesso', `"${nome}" excluído!`);
+        await renderizarTelaAparelhos();
+    });
+}
+
 async function abrirSeletorAparelhoForm() {
     const { data: aparelhos } = await supabaseClient.from('aparelhos').select('*').eq('ativo', true).order('marca').order('nome');
     if (!aparelhos || aparelhos.length === 0) {
@@ -1730,24 +1858,15 @@ async function abrirSeletorAparelhoForm() {
 // ==========================================
 // 18. PRODUTOS
 // ==========================================
-// ==========================================
-// PRODUTOS
-// ==========================================
-let produtoFiltroCategoria = 'Todas';
-let produtoBuscaTexto = '';
-let produtosCacheFull = [];
-
 async function renderizarTelaProdutos() {
     menuAtivoId = 'produtos';
     renderizarSidebar();
     const painel = document.getElementById('pc-painel-direito');
     if (painel) painel.classList.remove('ativo');
-
     const { data: produtos, error } = await supabaseClient.from('produtos').select('*').order('categoria').order('nome');
     if (error) { abrirModal('Erro', 'Erro: ' + error.message); return; }
     produtosCacheFull = produtos || [];
 
-    // Categorias únicas presentes
     const catsUnicas = [...new Set(produtosCacheFull.map(p => p.categoria || 'Outros'))].sort();
 
     produtoFiltroCategoria = 'Todas';
@@ -1818,7 +1937,6 @@ function renderizarListaProdutosFiltrada() {
         return;
     }
 
-    // Agrupa por categoria
     const porCategoria = {};
     filtrados.forEach(p => {
         const c = p.categoria || 'Outros';
@@ -1830,13 +1948,14 @@ function renderizarListaProdutosFiltrada() {
     Object.keys(porCategoria).sort().forEach(cat => {
         const catInfo = CATEGORIAS.find(x => x.id === cat) || { icone: '📦' };
         const itens = porCategoria[cat];
+        const idSeguro = cat.replace(/[^a-zA-Z0-9]/g, '');
 
         html += `<div class="categoria-header-clicavel" onclick="toggleCategoria('${cat.replace(/'/g, "\\'")}')" data-cat="${cat}">
             <span class="categoria-titulo-texto">${catInfo.icone} ${cat} <span class="cat-contador">${itens.length}</span></span>
-            <span class="categoria-toggle" id="toggle-cat-${cat.replace(/[^a-zA-Z0-9]/g, '')}">▾</span>
+            <span class="categoria-toggle" id="toggle-cat-${idSeguro}">▾</span>
         </div>`;
 
-        html += `<div class="categoria-grupo" id="grupo-cat-${cat.replace(/[^a-zA-Z0-9]/g, '')}">`;
+        html += `<div class="categoria-grupo" id="grupo-cat-${idSeguro}">`;
 
         itens.forEach(p => {
             const inativo = !p.ativo ? 'inativo' : '';
@@ -1851,7 +1970,8 @@ function renderizarListaProdutosFiltrada() {
                         <span class="item-compacto-meta">${modeloTag} <strong>${formatarMoeda(p.preco)}</strong></span>
                     </div>
                     <div class="item-compacto-acoes">
-                        <button onclick="renderizarFormProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}', ${p.preco}, ${p.ativo}, '${(p.categoria || '').replace(/'/g, "\\'")}', '${(p.modelo || '').replace(/'/g, "\\'")}')" class="btn-neutro btn-mini">✏️</button>
+                        <button onclick="renderizarFormProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}', ${p.preco}, ${p.ativo}, '${(p.categoria || '').replace(/'/g, "\\'")}', '${(p.modelo || '').replace(/'/g, "\\'")}')" class="btn-neutro btn-mini" title="Editar">✏️</button>
+                        <button onclick="confirmarExcluirProduto('${p.id}', '${p.nome.replace(/'/g, "\\'")}')" class="btn-perigo btn-mini" title="Excluir definitivamente">🗑️</button>
                         ${btnToggle}
                     </div>
                 </div>`;
@@ -1956,6 +2076,14 @@ async function reativarProduto(id) {
     if (error) { abrirModal('Erro', error.message); return; }
     abrirModal('Sucesso', 'Produto reativado!');
     await renderizarTelaProdutos();
+}
+async function confirmarExcluirProduto(id, nome) {
+    abrirModal('Excluir Produto', `Excluir "${nome}" permanentemente?\n\nEsta ação NÃO pode ser desfeita.\n\nVendas antigas mantêm o histórico.`, async () => {
+        const { error } = await supabaseClient.from('produtos').delete().eq('id', id);
+        if (error) { abrirModal('Erro', 'Não foi possível excluir: ' + error.message); return; }
+        abrirModal('Sucesso', `"${nome}" excluído!`);
+        await renderizarTelaProdutos();
+    });
 }
 
 // ==========================================
@@ -2064,11 +2192,19 @@ async function buscarMovimentosHistorico(periodo) {
     }
     document.getElementById('lista-historico').innerHTML = html;
 }
-function cancelarVenda(id) {
-    abrirModal('Cancelar Venda', 'Tem certeza? O valor sairá do total.', async () => {
+
+async function cancelarVenda(id) {
+    // Busca dados da venda
+    const { data: venda } = await supabaseClient.from('movimentos').select('*').eq('id', id).single();
+    if (!venda) { abrirModal('Erro', 'Venda não encontrada.'); return; }
+
+    const mensagem = `⚠️ CANCELAR ESTA VENDA?\n\nProduto: ${venda.produto}\nValor: ${formatarMoeda(venda.valor)}\nVendedor: ${venda.vendedor}\n\nEsta ação vai:\n• Remover o valor do total do caixa\n• Zerar a comissão desta venda\n• Marcar como "cancelada" no histórico\n\n⚠️ Se o cliente ainda quiser, refaça a venda em "Nova Venda".\n\nDeseja continuar?`;
+
+    abrirModal('Cancelar Venda', mensagem, async () => {
         const { error } = await supabaseClient.from('movimentos').update({ cancelado: true }).eq('id', id);
-        if (error) { abrirModal('Erro', error.message); return; }
-        abrirModal('Sucesso', 'Venda cancelada!');
+        if (error) { abrirModal('Erro', 'Erro: ' + error.message); return; }
+        await atualizarValorGaveta();
+        abrirModal('Venda Cancelada', 'A venda foi cancelada com sucesso.\n\nSe o cliente ainda quiser o produto, refaça a venda no menu "Nova Venda" (F2).');
         await renderizarHistorico();
     });
 }
